@@ -1,19 +1,22 @@
-use crate::errors::VulkanError;
-use ash::extensions::{ext, khr};
-use ash::version::{EntryV1_0, InstanceV1_0};
-use ash::vk;
 use std::ffi::CStr;
 use std::os::raw::c_void;
 use std::ptr::null;
 
-pub struct VulkanInstance {
+use ash::extensions::{ext, khr};
+use ash::version::{EntryV1_0, InstanceV1_0};
+use ash::vk;
+
+use crate::errors::VulkanError;
+use crate::extensions::ExtensionProperties;
+
+pub struct Instance {
     entry: ash::Entry,
     instance: ash::Instance,
     debug_utils: Option<ash::extensions::ext::DebugUtils>,
     messenger: Option<vk::DebugUtilsMessengerEXT>,
 }
 
-impl Drop for VulkanInstance {
+impl Drop for Instance {
     fn drop(&mut self) {
         unsafe {
             if let Some(debug_utils) = &self.debug_utils {
@@ -24,7 +27,7 @@ impl Drop for VulkanInstance {
     }
 }
 
-impl VulkanInstance {
+impl Instance {
     pub fn create_win_32_surface(
         &self,
         hwnd: vk::HWND,
@@ -44,6 +47,44 @@ impl VulkanInstance {
             .map_err(|err| VulkanError::InstanceError(err.to_string()))?;
 
         Ok((surface_loader, surface))
+    }
+
+    pub fn enumerate_physical_devices(&self) -> Result<Vec<vk::PhysicalDevice>, VulkanError> {
+        Ok(unsafe { self.instance.enumerate_physical_devices() }
+            .map_err(|err| VulkanError::InstanceError(err.to_string()))?)
+    }
+
+    pub fn get_physical_device_queue_family_properties(
+        &self,
+        device: vk::PhysicalDevice,
+    ) -> Vec<vk::QueueFamilyProperties> {
+        unsafe {
+            self.instance
+                .get_physical_device_queue_family_properties(device)
+        }
+    }
+
+    pub fn enumerate_device_extension_properties(
+        &self,
+        device: vk::PhysicalDevice,
+    ) -> Result<Vec<ExtensionProperties>, VulkanError> {
+        Ok(
+            unsafe { self.instance.enumerate_device_extension_properties(device) }
+                .map_err(|err| VulkanError::InstanceError(err.to_string()))?
+                .iter()
+                .map(|property| {
+                    let name = unsafe { CStr::from_ptr(property.extension_name.as_ptr()) };
+                    ExtensionProperties::from(name.to_str().unwrap())
+                })
+                .collect(),
+        )
+    }
+
+    pub fn get_physical_device_features(
+        &self,
+        device: vk::PhysicalDevice,
+    ) -> vk::PhysicalDeviceFeatures {
+        unsafe { self.instance.get_physical_device_features(device) }
     }
 
     unsafe extern "system" fn vulkan_debug_callback(
@@ -76,13 +117,13 @@ impl VulkanInstance {
     }
 }
 
-pub struct VulkanInstanceBuilder {
+pub struct InstanceBuilder {
     debug: bool,
 }
 
-impl VulkanInstanceBuilder {
+impl InstanceBuilder {
     pub fn new() -> Self {
-        VulkanInstanceBuilder { debug: false }
+        InstanceBuilder { debug: false }
     }
 
     pub fn with_debug_enabled(mut self, debug: bool) -> Self {
@@ -90,7 +131,7 @@ impl VulkanInstanceBuilder {
         self
     }
 
-    pub fn build(self) -> Result<VulkanInstance, VulkanError> {
+    pub fn build(self) -> Result<Instance, VulkanError> {
         let name = CStr::from_bytes_with_nul(b"R2R2\0").unwrap();
         let version = ash::vk_make_version!(0, 1, 0);
         let api_version = ash::vk_make_version!(1, 1, 0);
@@ -130,7 +171,7 @@ impl VulkanInstanceBuilder {
             let debug_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
                 .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::all())
                 .message_type(vk::DebugUtilsMessageTypeFlagsEXT::all())
-                .pfn_user_callback(Some(VulkanInstance::vulkan_debug_callback))
+                .pfn_user_callback(Some(Instance::vulkan_debug_callback))
                 .build();
 
             let debug_utils = Some(ext::DebugUtils::new(&entry, &instance));
@@ -148,7 +189,7 @@ impl VulkanInstanceBuilder {
             (None, None)
         };
 
-        Ok(VulkanInstance {
+        Ok(Instance {
             entry,
             instance,
             debug_utils,
