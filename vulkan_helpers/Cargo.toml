@@ -1,0 +1,13 @@
+[package]
+name = "vulkan_helpers"
+version = "0.1.0"
+authors = ["David KaliGS <david.partouche@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+ash = "0.29.0"
+semver = "0.9.0"
+
+[dependencies.log]
+version = "0.4.8"
+features = ["max_level_trace", "release_max_level_warn"]

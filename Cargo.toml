@@ -1,0 +1,13 @@
+[package]
+name = "r2r2"
+version = "0.1.0"
+authors = ["David Partouche <david.partouche@gmail.com>"]
+edition = "2018"
+
+[workspace]
+members = ["vulkan_helpers"]
+
+[dependencies]
+simplelog = "0.7.3"
+vulkan_helpers = { path = "vulkan_helpers" }
+winit = "0.20.0-alpha3"
