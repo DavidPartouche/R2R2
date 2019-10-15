@@ -26,6 +26,10 @@ impl Drop for Surface {
 }
 
 impl Surface {
+    pub fn get(&self) -> vk::SurfaceKHR {
+        self.surface
+    }
+
     pub fn get_physical_device_surface_support(
         &self,
         device: vk::PhysicalDevice,
@@ -41,29 +45,26 @@ impl Surface {
         &self,
         device: vk::PhysicalDevice,
     ) -> Result<SwapchainSupportDetails, VulkanError> {
-        let capabilities = unsafe {
-            self.surface_loader
-                .get_physical_device_surface_capabilities(device, self.surface)
-        }
-        .map_err(|err| VulkanError::SurfaceError(err.to_string()))?;
-
-        let formats = unsafe {
-            self.surface_loader
-                .get_physical_device_surface_formats(device, self.surface)
-        }
-        .map_err(|err| VulkanError::SurfaceError(err.to_string()))?;
-
-        let present_modes = unsafe {
-            self.surface_loader
-                .get_physical_device_surface_present_modes(device, self.surface)
-        }
-        .map_err(|err| VulkanError::SurfaceError(err.to_string()))?;
+        let capabilities = self.get_physical_device_surface_capabilities(device)?;
+        let formats = self.get_physical_device_surface_formats(device)?;
+        let present_modes = self.get_physical_device_surface_present_modes(device)?;
 
         Ok(SwapchainSupportDetails {
             capabilities,
             formats,
             present_modes,
         })
+    }
+
+    pub fn get_physical_device_surface_capabilities(
+        &self,
+        device: vk::PhysicalDevice,
+    ) -> Result<vk::SurfaceCapabilitiesKHR, VulkanError> {
+        unsafe {
+            self.surface_loader
+                .get_physical_device_surface_capabilities(device, self.surface)
+        }
+        .map_err(|err| VulkanError::SurfaceError(err.to_string()))
     }
 
     pub fn get_physical_device_surface_formats(
@@ -73,6 +74,17 @@ impl Surface {
         unsafe {
             self.surface_loader
                 .get_physical_device_surface_formats(device, self.surface)
+        }
+        .map_err(|err| VulkanError::SurfaceError(err.to_string()))
+    }
+
+    pub fn get_physical_device_surface_present_modes(
+        &self,
+        device: vk::PhysicalDevice,
+    ) -> Result<Vec<vk::PresentModeKHR>, VulkanError> {
+        unsafe {
+            self.surface_loader
+                .get_physical_device_surface_present_modes(device, self.surface)
         }
         .map_err(|err| VulkanError::SurfaceError(err.to_string()))
     }

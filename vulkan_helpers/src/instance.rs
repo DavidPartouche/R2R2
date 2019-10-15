@@ -1,9 +1,10 @@
 use std::ffi::CStr;
+use std::mem;
 use std::os::raw::c_void;
 use std::ptr::null;
 
 use ash::extensions::{ext, khr};
-use ash::version::{EntryV1_0, InstanceV1_0};
+use ash::version::{EntryV1_0, InstanceV1_0, InstanceV1_1};
 use ash::vk;
 
 use crate::errors::VulkanError;
@@ -28,6 +29,10 @@ impl Drop for Instance {
 }
 
 impl Instance {
+    pub fn get(&self) -> &ash::Instance {
+        &self.instance
+    }
+
     pub fn create_win_32_surface(
         &self,
         hwnd: vk::HWND,
@@ -85,6 +90,28 @@ impl Instance {
         device: vk::PhysicalDevice,
     ) -> vk::PhysicalDeviceFeatures {
         unsafe { self.instance.get_physical_device_features(device) }
+    }
+
+    pub fn get_physical_device_features2(
+        &self,
+        device: vk::PhysicalDevice,
+    ) -> vk::PhysicalDeviceFeatures2 {
+        unsafe {
+            let mut prop = mem::zeroed();
+            self.instance
+                .fp_v1_1()
+                .get_physical_device_features2(device, &mut prop);
+            prop
+        }
+    }
+
+    pub fn create_device(
+        &self,
+        device: vk::PhysicalDevice,
+        create_info: &vk::DeviceCreateInfo,
+    ) -> Result<ash::Device, VulkanError> {
+        unsafe { self.instance.create_device(device, create_info, None) }
+            .map_err(|err| VulkanError::InstanceError(err.to_string()))
     }
 
     unsafe extern "system" fn vulkan_debug_callback(

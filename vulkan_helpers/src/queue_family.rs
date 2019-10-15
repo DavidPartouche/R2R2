@@ -5,7 +5,7 @@ use crate::instance::Instance;
 use crate::physical_device::PhysicalDevice;
 use crate::surface::Surface;
 
-pub struct QueueFamily(u32);
+pub type QueueFamily = u32;
 
 pub struct QueueFamilyBuilder<'a> {
     instance: &'a Instance,
@@ -44,9 +44,9 @@ impl<'a> QueueFamilyBuilder<'a> {
                 }
             })
             .ok_or_else(|| {
-                VulkanError::QueueFamilyCreatoinError(String::from("Cannot find queue family"))
+                VulkanError::QueueFamilyCreationError(String::from("Cannot find queue family"))
             })?;
 
-        Ok(QueueFamily(queue_family))
+        Ok(queue_family)
     }
 }

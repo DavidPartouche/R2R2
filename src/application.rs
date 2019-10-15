@@ -1,6 +1,7 @@
+use simplelog::{Config, LevelFilter, SimpleLogger};
+
 use crate::renderer::Renderer;
 use crate::window::Window;
-use simplelog::{Config, LevelFilter, SimpleLogger};
 
 pub struct Application {
     renderer: Renderer,
@@ -61,7 +62,7 @@ impl ApplicationBuilder {
         let window =
             Window::new(&self.title, self.width, self.height).expect("Cannot create a window!");
 
-        let renderer = Renderer::new(true, window.hwnd());
+        let renderer = Renderer::new(true, window.hwnd(), self.width, self.height);
 
         Application {
             window: Some(window),

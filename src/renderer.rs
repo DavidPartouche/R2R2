@@ -8,7 +8,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(debug: bool, hwnd: *const c_void) -> Self {
+    pub fn new(debug: bool, hwnd: *const c_void, width: u32, height: u32) -> Self {
         let extensions = vec![
             ExtensionProperties::KhrSwapchain,
             ExtensionProperties::NvRayTracing,
@@ -16,8 +16,11 @@ impl Renderer {
         let context = VulkanContextBuilder::new()
             .with_debug_enabled(debug)
             .with_hwnd(hwnd)
+            .with_width(width)
+            .with_height(height)
             .with_extensions(extensions)
-            .build();
+            .build()
+            .unwrap();
         Self { context }
     }
 
