@@ -36,6 +36,44 @@ impl Drop for CommandBuffers {
     }
 }
 
+impl CommandBuffers {
+    pub fn begin_single_time_commands(&self) -> Result<vk::CommandBuffer, VulkanError> {
+        let alloc_info = vk::CommandBufferAllocateInfo::builder()
+            .level(vk::CommandBufferLevel::PRIMARY)
+            .command_pool(self.command_pools[0])
+            .command_buffer_count(1)
+            .build();
+        let command_buffer = self.device.allocate_command_buffers(&alloc_info)?[0];
+
+        let begin_info = vk::CommandBufferBeginInfo::builder()
+            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
+            .build();
+        self.device
+            .begin_command_buffer(command_buffer, &begin_info)?;
+
+        Ok(command_buffer)
+    }
+
+    pub fn end_single_time_commands(
+        &self,
+        command_buffer: vk::CommandBuffer,
+    ) -> Result<(), VulkanError> {
+        self.device.end_command_buffer(command_buffer)?;
+
+        let submit_info = vk::SubmitInfo::builder()
+            .command_buffers(&[command_buffer])
+            .build();
+
+        self.device.queue_submit(submit_info, vk::Fence::null())?;
+        self.device.queue_wait_idle()?;
+
+        self.device
+            .free_command_buffers(self.command_pools[0], &[command_buffer]);
+
+        Ok(())
+    }
+}
+
 pub struct CommandBuffersBuilder {
     queue_family: QueueFamily,
     device: Rc<Device>,

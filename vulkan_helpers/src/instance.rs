@@ -61,28 +61,29 @@ impl Instance {
 
     pub fn get_physical_device_queue_family_properties(
         &self,
-        device: vk::PhysicalDevice,
+        physical_device: vk::PhysicalDevice,
     ) -> Vec<vk::QueueFamilyProperties> {
         unsafe {
             self.instance
-                .get_physical_device_queue_family_properties(device)
+                .get_physical_device_queue_family_properties(physical_device)
         }
     }
 
     pub fn enumerate_device_extension_properties(
         &self,
-        device: vk::PhysicalDevice,
+        physical_device: vk::PhysicalDevice,
     ) -> Result<Vec<ExtensionProperties>, VulkanError> {
-        Ok(
-            unsafe { self.instance.enumerate_device_extension_properties(device) }
-                .map_err(|err| VulkanError::InstanceError(err.to_string()))?
-                .iter()
-                .map(|property| {
-                    let name = unsafe { CStr::from_ptr(property.extension_name.as_ptr()) };
-                    ExtensionProperties::from(name.to_str().unwrap())
-                })
-                .collect(),
-        )
+        Ok(unsafe {
+            self.instance
+                .enumerate_device_extension_properties(physical_device)
+        }
+        .map_err(|err| VulkanError::InstanceError(err.to_string()))?
+        .iter()
+        .map(|property| {
+            let name = unsafe { CStr::from_ptr(property.extension_name.as_ptr()) };
+            ExtensionProperties::from(name.to_str().unwrap())
+        })
+        .collect())
     }
 
     pub fn get_physical_device_features(
@@ -94,24 +95,84 @@ impl Instance {
 
     pub fn get_physical_device_features2(
         &self,
-        device: vk::PhysicalDevice,
+        physical_device: vk::PhysicalDevice,
     ) -> vk::PhysicalDeviceFeatures2 {
         unsafe {
             let mut prop = mem::zeroed();
             self.instance
                 .fp_v1_1()
-                .get_physical_device_features2(device, &mut prop);
+                .get_physical_device_features2(physical_device, &mut prop);
             prop
         }
     }
 
     pub fn create_device(
         &self,
-        device: vk::PhysicalDevice,
+        physical_device: vk::PhysicalDevice,
         create_info: &vk::DeviceCreateInfo,
     ) -> Result<ash::Device, VulkanError> {
-        unsafe { self.instance.create_device(device, create_info, None) }
-            .map_err(|err| VulkanError::InstanceError(err.to_string()))
+        unsafe {
+            self.instance
+                .create_device(physical_device, create_info, None)
+        }
+        .map_err(|err| VulkanError::InstanceError(err.to_string()))
+    }
+
+    pub fn find_depth_format(&self, physical_device: vk::PhysicalDevice) -> Option<vk::Format> {
+        self.find_supported_format(
+            physical_device,
+            vec![
+                vk::Format::D32_SFLOAT,
+                vk::Format::D32_SFLOAT_S8_UINT,
+                vk::Format::D24_UNORM_S8_UINT,
+            ],
+            vk::ImageTiling::OPTIMAL,
+            vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
+        )
+    }
+
+    fn find_supported_format(
+        &self,
+        physical_device: vk::PhysicalDevice,
+        candidates: Vec<vk::Format>,
+        tiling: vk::ImageTiling,
+        features: vk::FormatFeatureFlags,
+    ) -> Option<vk::Format> {
+        candidates.into_iter().find(|format| {
+            let props = unsafe {
+                self.instance
+                    .get_physical_device_format_properties(physical_device, *format)
+            };
+            (tiling == vk::ImageTiling::LINEAR && props.linear_tiling_features.contains(features))
+                || (tiling == vk::ImageTiling::OPTIMAL
+                    && props.optimal_tiling_features.contains(features))
+        })
+    }
+
+    pub fn find_memory_type(
+        &self,
+        physical_device: vk::PhysicalDevice,
+        type_filter: u32,
+        properties: vk::MemoryPropertyFlags,
+    ) -> Option<u32> {
+        let memory_properties = unsafe {
+            self.instance
+                .get_physical_device_memory_properties(physical_device)
+        };
+
+        memory_properties
+            .memory_types
+            .iter()
+            .enumerate()
+            .find_map(|(index, memory_type)| {
+                if type_filter & (1 << index as u32) != 0
+                    && memory_type.property_flags.contains(properties)
+                {
+                    Some(index as u32)
+                } else {
+                    None
+                }
+            })
     }
 
     unsafe extern "system" fn vulkan_debug_callback(

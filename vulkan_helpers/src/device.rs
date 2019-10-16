@@ -33,6 +33,17 @@ impl Device {
         Ok(())
     }
 
+    pub fn queue_submit(
+        &self,
+        submit_info: vk::SubmitInfo,
+        fence: vk::Fence,
+    ) -> Result<(), VulkanError> {
+        unsafe { self.device.queue_submit(self.queue, &[submit_info], fence) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))?;
+
+        Ok(())
+    }
+
     pub fn create_command_pool(
         &self,
         pool_info: &vk::CommandPoolCreateInfo,
@@ -107,6 +118,109 @@ impl Device {
 
     pub fn new_swapchain(&self) -> khr::Swapchain {
         khr::Swapchain::new(self.instance.get(), &self.device)
+    }
+
+    pub fn create_render_pass(
+        &self,
+        render_pass_info: &vk::RenderPassCreateInfo,
+    ) -> Result<vk::RenderPass, VulkanError> {
+        unsafe { self.device.create_render_pass(&render_pass_info, None) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn destroy_render_pass(&self, render_pass: vk::RenderPass) {
+        unsafe {
+            self.device.destroy_render_pass(render_pass, None);
+        }
+    }
+
+    pub fn create_image_view(
+        &self,
+        view_info: &vk::ImageViewCreateInfo,
+    ) -> Result<vk::ImageView, VulkanError> {
+        unsafe { self.device.create_image_view(view_info, None) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn destroy_image_view(&self, image_view: vk::ImageView) {
+        unsafe {
+            self.device.destroy_image_view(image_view, None);
+        }
+    }
+
+    pub fn create_image(&self, image_info: &vk::ImageCreateInfo) -> Result<vk::Image, VulkanError> {
+        unsafe { self.device.create_image(&image_info, None) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn destroy_image(&self, image: vk::Image) {
+        unsafe {
+            self.device.destroy_image(image, None);
+        }
+    }
+
+    pub fn get_image_memory_requirements(&self, image: vk::Image) -> vk::MemoryRequirements {
+        unsafe { self.device.get_image_memory_requirements(image) }
+    }
+
+    pub fn allocate_memory(
+        &self,
+        alloc_info: &vk::MemoryAllocateInfo,
+    ) -> Result<vk::DeviceMemory, VulkanError> {
+        unsafe { self.device.allocate_memory(&alloc_info, None) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn free_memory(&self, memory: vk::DeviceMemory) {
+        unsafe {
+            self.device.free_memory(memory, None);
+        }
+    }
+
+    pub fn bind_image_memory(
+        &self,
+        image: vk::Image,
+        memory: vk::DeviceMemory,
+    ) -> Result<(), VulkanError> {
+        unsafe { self.device.bind_image_memory(image, memory, 0) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn begin_command_buffer(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        begin_info: &vk::CommandBufferBeginInfo,
+    ) -> Result<(), VulkanError> {
+        unsafe { self.device.begin_command_buffer(command_buffer, begin_info) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn end_command_buffer(&self, command_buffer: vk::CommandBuffer) -> Result<(), VulkanError> {
+        unsafe { self.device.end_command_buffer(command_buffer) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn cmd_pipeline_barrier(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        src_stage: vk::PipelineStageFlags,
+        dst_stage: vk::PipelineStageFlags,
+        dependency_flags: vk::DependencyFlags,
+        memory_barriers: &[vk::MemoryBarrier],
+        buffer_memory_barriers: &[vk::BufferMemoryBarrier],
+        image_memory_barriers: &[vk::ImageMemoryBarrier],
+    ) {
+        unsafe {
+            self.device.cmd_pipeline_barrier(
+                command_buffer,
+                src_stage,
+                dst_stage,
+                dependency_flags,
+                memory_barriers,
+                buffer_memory_barriers,
+                image_memory_barriers,
+            );
+        }
     }
 }
 

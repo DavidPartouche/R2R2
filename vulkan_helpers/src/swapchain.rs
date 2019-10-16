@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use ash::extensions::khr;
 use ash::vk;
 
@@ -11,10 +9,9 @@ use crate::surface::Surface;
 use crate::surface_format::SurfaceFormat;
 
 pub struct Swapchain {
-    device: Rc<Device>,
     swapchain_loader: khr::Swapchain,
     swapchain: vk::SwapchainKHR,
-    back_buffer: Vec<vk::Image>,
+    back_buffers: Vec<vk::Image>,
 }
 
 impl Drop for Swapchain {
@@ -27,25 +24,24 @@ impl Drop for Swapchain {
 }
 
 impl Swapchain {
-    pub fn get(&self) -> vk::SwapchainKHR {
-        self.swapchain
+    pub fn get_back_buffers(&self) -> &Vec<vk::Image> {
+        &self.back_buffers
     }
 }
 
 pub struct SwapchainBuilder<'a> {
-    device: Rc<Device>,
+    device: &'a Device,
     surface: &'a Surface,
     physical_device: PhysicalDevice,
     surface_format: SurfaceFormat,
     present_mode: PresentMode,
-    old_swapchain: vk::SwapchainKHR,
     width: u32,
     height: u32,
 }
 
 impl<'a> SwapchainBuilder<'a> {
     pub fn new(
-        device: Rc<Device>,
+        device: &'a Device,
         surface: &'a Surface,
         physical_device: PhysicalDevice,
         surface_format: SurfaceFormat,
@@ -57,7 +53,6 @@ impl<'a> SwapchainBuilder<'a> {
             physical_device,
             surface_format,
             present_mode,
-            old_swapchain: vk::SwapchainKHR::null(),
             width: 0,
             height: 0,
         }
@@ -70,11 +65,6 @@ impl<'a> SwapchainBuilder<'a> {
 
     pub fn with_height(mut self, height: u32) -> Self {
         self.height = height;
-        self
-    }
-
-    pub fn with_old_swapchain(mut self, swapchain: vk::SwapchainKHR) -> Self {
-        self.old_swapchain = swapchain;
         self
     }
 
@@ -106,7 +96,6 @@ impl<'a> SwapchainBuilder<'a> {
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
             .present_mode(self.present_mode)
             .clipped(true)
-            .old_swapchain(self.old_swapchain)
             .min_image_count(image_count)
             .image_extent(vk::Extent2D::builder().width(width).height(height).build())
             .build();
@@ -119,10 +108,9 @@ impl<'a> SwapchainBuilder<'a> {
             .map_err(|err| VulkanError::SwapchainCreationError(err.to_string()))?;
 
         Ok(Swapchain {
-            device: self.device,
             swapchain_loader,
             swapchain,
-            back_buffer,
+            back_buffers: back_buffer,
         })
     }
 }
