@@ -8,6 +8,7 @@ use crate::descriptor_pool::{DescriptorPool, DescriptorPoolBuilder};
 use crate::device::{Device, DeviceBuilder};
 use crate::errors::VulkanError;
 use crate::extensions::ExtensionProperties;
+use crate::frame_buffer::{FrameBuffers, FrameBuffersBuilder};
 use crate::image_views::{ImageViews, ImageViewsBuilder};
 use crate::instance::{Instance, InstanceBuilder};
 use crate::physical_device::{PhysicalDevice, PhysicalDeviceBuilder};
@@ -19,6 +20,7 @@ use crate::surface_format::{SurfaceFormat, SurfaceFormatBuilder};
 use crate::swapchain::{Swapchain, SwapchainBuilder};
 
 pub struct VulkanContext {
+    frame_buffers: FrameBuffers,
     depth_resources: DepthResources,
     image_views: ImageViews,
     render_pass: RenderPass,
@@ -119,6 +121,12 @@ impl VulkanContextBuilder {
             Rc::clone(&device),
             &command_buffers,
         )?;
+        let frame_buffers = self.create_frame_buffers(
+            Rc::clone(&device),
+            &render_pass,
+            &image_views,
+            &depth_resources,
+        )?;
 
         Ok(VulkanContext {
             instance,
@@ -134,6 +142,7 @@ impl VulkanContextBuilder {
             render_pass,
             image_views,
             depth_resources,
+            frame_buffers,
         })
     }
 
@@ -254,6 +263,19 @@ impl VulkanContextBuilder {
         command_buffers: &CommandBuffers,
     ) -> Result<DepthResources, VulkanError> {
         DepthResourcesBuilder::new(instance, physical_device, device, command_buffers)
+            .with_width(self.width)
+            .with_height(self.height)
+            .build()
+    }
+
+    fn create_frame_buffers(
+        &self,
+        device: Rc<Device>,
+        render_pass: &RenderPass,
+        image_views: &ImageViews,
+        depth_resources: &DepthResources,
+    ) -> Result<FrameBuffers, VulkanError> {
+        FrameBuffersBuilder::new(device, render_pass, image_views, depth_resources)
             .with_width(self.width)
             .with_height(self.height)
             .build()

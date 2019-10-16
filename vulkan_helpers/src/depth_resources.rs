@@ -23,6 +23,12 @@ impl Drop for DepthResources {
     }
 }
 
+impl DepthResources {
+    pub fn get_image_view(&self) -> vk::ImageView {
+        self.depth_image_view
+    }
+}
+
 pub struct DepthResourcesBuilder<'a> {
     instance: &'a Instance,
     physical_device: PhysicalDevice,
@@ -141,7 +147,7 @@ impl<'a> DepthResourcesBuilder<'a> {
             .build();
         let image_memory = self.device.allocate_memory(&alloc_info)?;
 
-        self.device.bind_image_memory(image, image_memory);
+        self.device.bind_image_memory(image, image_memory)?;
 
         Ok((image, image_memory))
     }

@@ -6,6 +6,7 @@ mod depth_resources;
 mod descriptor_pool;
 mod device;
 mod errors;
+mod frame_buffer;
 mod image_views;
 mod instance;
 mod physical_device;

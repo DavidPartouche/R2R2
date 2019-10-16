@@ -20,6 +20,12 @@ impl Drop for ImageViews {
     }
 }
 
+impl ImageViews {
+    pub fn get_image_views(&self) -> &Vec<vk::ImageView> {
+        &self.back_buffer_views
+    }
+}
+
 pub struct ImageViewsBuilder<'a> {
     device: Rc<Device>,
     surface_format: SurfaceFormat,

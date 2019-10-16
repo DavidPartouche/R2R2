@@ -19,6 +19,12 @@ impl Drop for RenderPass {
     }
 }
 
+impl RenderPass {
+    pub fn get(&self) -> vk::RenderPass {
+        self.render_pass
+    }
+}
+
 pub struct RenderPassBuilder<'a> {
     instance: &'a Instance,
     physical_device: PhysicalDevice,

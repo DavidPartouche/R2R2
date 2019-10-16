@@ -186,6 +186,18 @@ impl Device {
             .map_err(|err| VulkanError::DeviceError(err.to_string()))
     }
 
+    pub fn create_frame_buffer(
+        &self,
+        info: &vk::FramebufferCreateInfo,
+    ) -> Result<vk::Framebuffer, VulkanError> {
+        unsafe { self.device.create_framebuffer(info, None) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn destroy_frame_buffer(&self, frame_buffer: vk::Framebuffer) {
+        unsafe { self.device.destroy_framebuffer(frame_buffer, None) }
+    }
+
     pub fn begin_command_buffer(
         &self,
         command_buffer: vk::CommandBuffer,
