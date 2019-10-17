@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use ash::extensions::khr;
 use ash::vk;
 
@@ -9,6 +11,7 @@ use crate::surface::Surface;
 use crate::surface_format::SurfaceFormat;
 
 pub struct Swapchain {
+    device: Rc<Device>,
     swapchain_loader: khr::Swapchain,
     swapchain: vk::SwapchainKHR,
     back_buffers: Vec<vk::Image>,
@@ -27,10 +30,42 @@ impl Swapchain {
     pub fn get_back_buffers(&self) -> &Vec<vk::Image> {
         &self.back_buffers
     }
+
+    pub fn acquire_next_image(&self, semaphore: vk::Semaphore) -> Result<usize, VulkanError> {
+        let (index, _) = unsafe {
+            self.swapchain_loader.acquire_next_image(
+                self.swapchain,
+                std::u64::MAX,
+                semaphore,
+                vk::Fence::null(),
+            )
+        }
+        .map_err(|err| VulkanError::SwapchainError(err.to_string()))?;
+        Ok(index as usize)
+    }
+
+    pub fn queue_present(
+        &self,
+        semaphore: vk::Semaphore,
+        image_index: u32,
+    ) -> Result<(), VulkanError> {
+        let info = vk::PresentInfoKHR::builder()
+            .wait_semaphores(&[semaphore])
+            .swapchains(&[self.swapchain])
+            .image_indices(&[image_index])
+            .build();
+        unsafe {
+            self.swapchain_loader
+                .queue_present(self.device.queue(), &info)
+        }
+        .map_err(|err| VulkanError::SwapchainError(err.to_string()))?;
+
+        Ok(())
+    }
 }
 
 pub struct SwapchainBuilder<'a> {
-    device: &'a Device,
+    device: Rc<Device>,
     surface: &'a Surface,
     physical_device: PhysicalDevice,
     surface_format: SurfaceFormat,
@@ -41,7 +76,7 @@ pub struct SwapchainBuilder<'a> {
 
 impl<'a> SwapchainBuilder<'a> {
     pub fn new(
-        device: &'a Device,
+        device: Rc<Device>,
         surface: &'a Surface,
         physical_device: PhysicalDevice,
         surface_format: SurfaceFormat,
@@ -108,6 +143,7 @@ impl<'a> SwapchainBuilder<'a> {
             .map_err(|err| VulkanError::SwapchainCreationError(err.to_string()))?;
 
         Ok(Swapchain {
+            device: self.device,
             swapchain_loader,
             swapchain,
             back_buffers: back_buffer,

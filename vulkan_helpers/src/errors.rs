@@ -13,16 +13,9 @@ pub enum VulkanError {
     SwapchainCreationError(String),
     RenderPassCreationError(String),
     DepthResourcesCreationError(String),
-    //    ShaderCreationError(String),
-    //    PipelineCreationError(String),
-    //    FramebufferCreationError(String),
-    //    SemaphoreCreationError(String),
-    //    FenceCreationError(String),
-    //    VertexBufferCreationError(String),
-    //    DescriptorSetLayoutCreationError(String),
-    //    TextureImageCreationError(String),
-    //    SwapchainError(String),
-    //    FenceWaitError(String),
+    SwapchainError(String),
+    ShaderCreationError(String),
+    VertexBufferCreationError(String),
 }
 
 impl Display for VulkanError {

@@ -16,6 +16,12 @@ impl Drop for DescriptorPool {
     }
 }
 
+impl DescriptorPool {
+    pub fn get(&self) -> vk::DescriptorPool {
+        self.descriptor_pool
+    }
+}
+
 pub struct DescriptorPoolBuilder {
     device: Rc<Device>,
 }

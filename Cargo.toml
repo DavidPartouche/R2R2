@@ -8,6 +8,7 @@ edition = "2018"
 members = ["vulkan_helpers"]
 
 [dependencies]
+nalgebra-glm = "0.4.2"
 simplelog = "0.7.3"
 vulkan_helpers = { path = "vulkan_helpers" }
 winit = "0.20.0-alpha3"

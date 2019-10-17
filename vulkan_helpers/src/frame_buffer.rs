@@ -21,6 +21,12 @@ impl Drop for FrameBuffers {
     }
 }
 
+impl FrameBuffers {
+    pub fn get(&self, index: usize) -> vk::Framebuffer {
+        self.frame_buffers[index]
+    }
+}
+
 pub struct FrameBuffersBuilder<'a> {
     device: Rc<Device>,
     render_pass: &'a RenderPass,

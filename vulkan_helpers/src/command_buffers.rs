@@ -37,6 +37,14 @@ impl Drop for CommandBuffers {
 }
 
 impl CommandBuffers {
+    pub fn get(&self, index: usize) -> vk::CommandBuffer {
+        self.command_buffers[index]
+    }
+
+    pub fn get_render_complete_semaphore(&self, index: usize) -> vk::Semaphore {
+        self.render_complete_semaphores[index]
+    }
+
     pub fn begin_single_time_commands(&self) -> Result<vk::CommandBuffer, VulkanError> {
         let alloc_info = vk::CommandBufferAllocateInfo::builder()
             .level(vk::CommandBufferLevel::PRIMARY)
@@ -64,13 +72,46 @@ impl CommandBuffers {
             .command_buffers(&[command_buffer])
             .build();
 
-        self.device.queue_submit(submit_info, vk::Fence::null())?;
+        self.device
+            .queue_submit(&[submit_info], vk::Fence::null())?;
         self.device.queue_wait_idle()?;
 
         self.device
             .free_command_buffers(self.command_pools[0], &[command_buffer]);
 
         Ok(())
+    }
+
+    pub fn wait_for_fence(&self, frame_index: usize) -> Result<(), VulkanError> {
+        self.device.wait_for_fences(&[self.fences[frame_index]])
+    }
+
+    pub fn reset_fence(&self, frame_index: usize) -> Result<(), VulkanError> {
+        self.device.reset_fences(&[self.fences[frame_index]])
+    }
+
+    pub fn begin_command_buffer(&self, frame_index: usize) -> Result<(), VulkanError> {
+        let begin_info = vk::CommandBufferBeginInfo::builder()
+            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
+            .build();
+        self.device
+            .begin_command_buffer(self.command_buffers[frame_index], &begin_info)
+    }
+
+    pub fn end_command_buffer(&self, frame_index: usize) -> Result<(), VulkanError> {
+        self.device
+            .end_command_buffer(self.command_buffers[frame_index])
+    }
+
+    pub fn queue_submit(&self, frame_index: usize) -> Result<(), VulkanError> {
+        let info = vk::SubmitInfo::builder()
+            .wait_semaphores(&[self.present_complete_semaphores[frame_index]])
+            .wait_dst_stage_mask(&[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT])
+            .command_buffers(&[self.command_buffers[frame_index]])
+            .signal_semaphores(&[self.render_complete_semaphores[frame_index]])
+            .build();
+
+        self.device.queue_submit(&[info], self.fences[frame_index])
     }
 }
 

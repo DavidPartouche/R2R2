@@ -1,10 +1,9 @@
 use std::ffi::CStr;
-use std::mem;
 use std::os::raw::c_void;
 use std::ptr::null;
 
 use ash::extensions::{ext, khr};
-use ash::version::{EntryV1_0, InstanceV1_0, InstanceV1_1};
+use ash::version::{EntryV1_0, InstanceV1_0};
 use ash::vk;
 
 use crate::errors::VulkanError;
@@ -93,17 +92,11 @@ impl Instance {
         unsafe { self.instance.get_physical_device_features(device) }
     }
 
-    pub fn get_physical_device_features2(
+    pub fn get_physical_device_memory_properties(
         &self,
-        physical_device: vk::PhysicalDevice,
-    ) -> vk::PhysicalDeviceFeatures2 {
-        unsafe {
-            let mut prop = mem::zeroed();
-            self.instance
-                .fp_v1_1()
-                .get_physical_device_features2(physical_device, &mut prop);
-            prop
-        }
+        device: vk::PhysicalDevice,
+    ) -> vk::PhysicalDeviceMemoryProperties {
+        unsafe { self.instance.get_physical_device_memory_properties(device) }
     }
 
     pub fn create_device(

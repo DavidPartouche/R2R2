@@ -11,6 +11,8 @@ use crate::instance::Instance;
 use crate::physical_device::PhysicalDevice;
 use crate::queue_family::QueueFamily;
 
+const FENCE_TIMEOUT: u64 = 100;
+
 pub struct Device {
     instance: Rc<Instance>,
     device: ash::Device,
@@ -26,6 +28,10 @@ impl Drop for Device {
 }
 
 impl Device {
+    pub fn queue(&self) -> vk::Queue {
+        self.queue
+    }
+
     pub fn queue_wait_idle(&self) -> Result<(), VulkanError> {
         unsafe { self.device.queue_wait_idle(self.queue) }
             .map_err(|err| VulkanError::DeviceError(err.to_string()))?;
@@ -35,10 +41,10 @@ impl Device {
 
     pub fn queue_submit(
         &self,
-        submit_info: vk::SubmitInfo,
+        submit_info: &[vk::SubmitInfo],
         fence: vk::Fence,
     ) -> Result<(), VulkanError> {
-        unsafe { self.device.queue_submit(self.queue, &[submit_info], fence) }
+        unsafe { self.device.queue_submit(self.queue, submit_info, fence) }
             .map_err(|err| VulkanError::DeviceError(err.to_string()))?;
 
         Ok(())
@@ -198,6 +204,108 @@ impl Device {
         unsafe { self.device.destroy_framebuffer(frame_buffer, None) }
     }
 
+    pub fn create_descriptor_set_layout(
+        &self,
+        layout_info: &vk::DescriptorSetLayoutCreateInfo,
+    ) -> Result<vk::DescriptorSetLayout, VulkanError> {
+        unsafe { self.device.create_descriptor_set_layout(&layout_info, None) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn destroy_descriptor_set_layout(&self, descriptor_set_layout: vk::DescriptorSetLayout) {
+        unsafe {
+            self.device
+                .destroy_descriptor_set_layout(descriptor_set_layout, None);
+        }
+    }
+
+    pub fn create_pipeline_layout(
+        &self,
+        info: &vk::PipelineLayoutCreateInfo,
+    ) -> Result<vk::PipelineLayout, VulkanError> {
+        unsafe { self.device.create_pipeline_layout(info, None) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn destroy_pipeline_layout(&self, pipeline_layout: vk::PipelineLayout) {
+        unsafe {
+            self.device.destroy_pipeline_layout(pipeline_layout, None);
+        }
+    }
+
+    pub fn create_graphics_pipelines(
+        &self,
+        pipeline_info: &[vk::GraphicsPipelineCreateInfo],
+    ) -> Result<Vec<vk::Pipeline>, VulkanError> {
+        unsafe {
+            self.device
+                .create_graphics_pipelines(vk::PipelineCache::null(), pipeline_info, None)
+        }
+        .map_err(|(_, err)| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn destroy_pipeline(&self, pipeline: vk::Pipeline) {
+        unsafe {
+            self.device.destroy_pipeline(pipeline, None);
+        }
+    }
+
+    pub fn create_shader_module(
+        &self,
+        info: &vk::ShaderModuleCreateInfo,
+    ) -> Result<vk::ShaderModule, VulkanError> {
+        unsafe { self.device.create_shader_module(info, None) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn destroy_shader_module(&self, shader_module: vk::ShaderModule) {
+        unsafe { self.device.destroy_shader_module(shader_module, None) }
+    }
+
+    pub fn create_buffer(&self, info: &vk::BufferCreateInfo) -> Result<vk::Buffer, VulkanError> {
+        unsafe { self.device.create_buffer(info, None) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn destroy_buffer(&self, buffer: vk::Buffer) {
+        unsafe {
+            self.device.destroy_buffer(buffer, None);
+        }
+    }
+
+    pub fn get_buffer_memory_requirements(&self, buffer: vk::Buffer) -> vk::MemoryRequirements {
+        unsafe { self.device.get_buffer_memory_requirements(buffer) }
+    }
+
+    pub fn bind_buffer_memory(
+        &self,
+        buffer: vk::Buffer,
+        memory: vk::DeviceMemory,
+    ) -> Result<(), VulkanError> {
+        unsafe { self.device.bind_buffer_memory(buffer, memory, 0) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn allocate_descriptor_sets(
+        &self,
+        info: &vk::DescriptorSetAllocateInfo,
+    ) -> Result<Vec<vk::DescriptorSet>, VulkanError> {
+        unsafe { self.device.allocate_descriptor_sets(info) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn free_descriptor_sets(
+        &self,
+        pool: vk::DescriptorPool,
+        descriptor_sets: &[vk::DescriptorSet],
+    ) {
+        unsafe { self.device.free_descriptor_sets(pool, descriptor_sets) }
+    }
+
+    pub fn update_descriptor_sets(&self, descriptor_writes: &[vk::WriteDescriptorSet]) {
+        unsafe { self.device.update_descriptor_sets(descriptor_writes, &[]) }
+    }
+
     pub fn begin_command_buffer(
         &self,
         command_buffer: vk::CommandBuffer,
@@ -232,6 +340,47 @@ impl Device {
                 buffer_memory_barriers,
                 image_memory_barriers,
             );
+        }
+    }
+
+    pub fn wait_for_fences(&self, fences: &[vk::Fence]) -> Result<(), VulkanError> {
+        unsafe { self.device.wait_for_fences(fences, true, FENCE_TIMEOUT) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn reset_fences(&self, fences: &[vk::Fence]) -> Result<(), VulkanError> {
+        unsafe { self.device.reset_fences(fences) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn cmd_begin_render_pass(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        info: &vk::RenderPassBeginInfo,
+    ) {
+        unsafe {
+            self.device
+                .cmd_begin_render_pass(command_buffer, info, vk::SubpassContents::INLINE);
+        }
+    }
+
+    pub fn cmd_next_subpass(&self, command_buffer: vk::CommandBuffer) {
+        unsafe {
+            self.device
+                .cmd_next_subpass(command_buffer, vk::SubpassContents::INLINE);
+        }
+    }
+
+    pub fn cmd_end_render_pass(&self, command_buffer: vk::CommandBuffer) {
+        unsafe {
+            self.device.cmd_end_render_pass(command_buffer);
+        }
+    }
+
+    pub fn cmd_bind_pipeline(&self, command_buffer: vk::CommandBuffer, pipeline: vk::Pipeline) {
+        unsafe {
+            self.device
+                .cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, pipeline)
         }
     }
 }
@@ -277,18 +426,14 @@ impl<'a> DeviceBuilder<'a> {
             .map(|extension| extension.name().as_ptr())
             .collect();
 
-        let mut desc_index_features =
-            vk::PhysicalDeviceDescriptorIndexingFeaturesEXT::builder().build();
-
-        let supported_features = self
-            .instance
-            .get_physical_device_features2(self.physical_device);
+        let supported_features = vk::PhysicalDeviceFeatures::builder()
+            .sampler_anisotropy(true)
+            .build();
 
         let create_info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(&[queue_info])
             .enabled_extension_names(&extension_names)
-            .enabled_features(&supported_features.features)
-            .push_next(&mut desc_index_features)
+            .enabled_features(&supported_features)
             .build();
 
         let device = self

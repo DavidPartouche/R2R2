@@ -1,4 +1,4 @@
 pub mod application;
+pub mod renderer;
 
-mod renderer;
 mod window;

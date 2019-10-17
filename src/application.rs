@@ -4,7 +4,7 @@ use crate::renderer::Renderer;
 use crate::window::Window;
 
 pub struct Application {
-    renderer: Renderer,
+    pub renderer: Renderer,
     window: Option<Window>,
 }
 
