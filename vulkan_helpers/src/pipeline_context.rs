@@ -15,14 +15,14 @@ use crate::texture::Texture;
 use crate::vulkan_context::VulkanContext;
 
 pub struct GraphicsPipelineContext {
-    device: Rc<Device>,
+    pub(crate) device: Rc<Device>,
+    pub(crate) ray_tracing: Rc<RayTracing>,
     uniform_buffer: Buffer,
     material_buffer: Buffer,
     textures: Vec<Texture>,
     descriptor_set: DescriptorSet,
     graphics_pipeline: Pipeline,
     descriptor_set_layout: DescriptorSetLayout,
-    ray_tracing: RayTracing,
     indices_count: u32,
 }
 
@@ -115,32 +115,32 @@ impl<'a> GraphicsPipelineContextBuilder<'a> {
     }
 
     pub fn build(self) -> Result<GraphicsPipelineContext, VulkanError> {
-        let descriptor_set_layout = DescriptorSetLayoutBuilder::new(self.context)
+        let descriptor_set_layout = DescriptorSetLayoutBuilder::new(&self.context)
             .with_texture_count(self.textures.len() as u32)
             .build()?;
 
-        let graphics_pipeline = PipelineBuilder::new(self.context, &descriptor_set_layout)
+        let graphics_pipeline = PipelineBuilder::new(&self.context, &descriptor_set_layout)
             .with_vertex_shader(self.vertex_shader.unwrap())
             .with_fragment_shader(self.fragment_shader.unwrap())
             .build()?;
 
-        let uniform_buffer = BufferBuilder::new(self.context)
+        let uniform_buffer = BufferBuilder::new(&self.context)
             .with_type(BufferType::Uniform)
             .with_size(self.ubo_size as vk::DeviceSize)
             .build()?;
 
         let material_buffer = self.material_buffer.ok_or_else(|| {
-            VulkanError::GrahpicsPipelineCreationError(String::from("Material buffer missing"))
+            VulkanError::GraphicsPipelineCreationError(String::from("Material buffer missing"))
         })?;
 
-        let descriptor_set = DescriptorSetBuilder::new(self.context, &descriptor_set_layout)
+        let descriptor_set = DescriptorSetBuilder::new(&self.context, &descriptor_set_layout)
             .with_uniform_buffer(&uniform_buffer)
             .with_material_buffer(&material_buffer)
             .with_textures(&self.textures)
             .build()
             .unwrap();
 
-        let ray_tracing = RayTracingBuilder::new(self.context).build()?;
+        let ray_tracing = Rc::new(RayTracingBuilder::new(&self.context).build()?);
 
         Ok(GraphicsPipelineContext {
             device: Rc::clone(&self.context.device),

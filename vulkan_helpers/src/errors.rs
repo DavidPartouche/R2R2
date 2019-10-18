@@ -18,7 +18,8 @@ pub enum VulkanError {
     VertexBufferCreationError(String),
     ImageCreationError(String),
     TextureCreationError(String),
-    GrahpicsPipelineCreationError(String),
+    GraphicsPipelineCreationError(String),
+    RayTracingError(String),
 }
 
 impl Display for VulkanError {

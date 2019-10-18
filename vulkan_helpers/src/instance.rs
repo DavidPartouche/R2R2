@@ -1,5 +1,4 @@
 use std::ffi::CStr;
-use std::mem;
 use std::os::raw::c_void;
 use std::ptr::null;
 

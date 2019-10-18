@@ -10,6 +10,7 @@ use crate::vulkan_context::VulkanContext;
 
 pub enum BufferType {
     Index,
+    RayTracing,
     Staging,
     Storage,
     Uniform,
@@ -33,6 +34,10 @@ impl Drop for Buffer {
 impl Buffer {
     pub fn get(&self) -> vk::Buffer {
         self.buffer
+    }
+
+    pub fn get_memory(&self) -> vk::DeviceMemory {
+        self.buffer_memory
     }
 
     pub fn copy_data(&self, buffer: *const c_void) -> Result<(), VulkanError> {
@@ -78,6 +83,7 @@ impl<'a> BufferBuilder<'a> {
             BufferType::Index => {
                 vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST
             }
+            BufferType::RayTracing => vk::BufferUsageFlags::RAY_TRACING_NV,
             BufferType::Staging => vk::BufferUsageFlags::TRANSFER_SRC,
             BufferType::Storage => {
                 vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::TRANSFER_DST
@@ -90,6 +96,7 @@ impl<'a> BufferBuilder<'a> {
 
         let properties = match &self.ty {
             BufferType::Index => vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            BufferType::RayTracing => vk::MemoryPropertyFlags::DEVICE_LOCAL,
             BufferType::Staging => {
                 vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT
             }

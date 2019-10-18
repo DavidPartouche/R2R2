@@ -4,8 +4,12 @@ use std::path::Path;
 
 use nalgebra_glm as glm;
 
+use vulkan_helpers::acceleration_structure::{
+    AccelerationStructure, AccelerationStructureBuilder, BottomLevelAccelerationStructureBuilder,
+};
 use vulkan_helpers::extensions::DeviceExtensions;
 use vulkan_helpers::pipeline_context::{GraphicsPipelineContext, GraphicsPipelineContextBuilder};
+use vulkan_helpers::vertex::Vertex;
 use vulkan_helpers::vulkan_context::{VulkanContext, VulkanContextBuilder};
 
 use crate::geometry_instance::{GeometryInstance, GeometryInstanceBuilder};
@@ -21,7 +25,7 @@ struct UniformBufferObject {
 
 pub struct Renderer {
     context: VulkanContext,
-    geometry: Option<GeometryInstance>,
+    models: Vec<GeometryInstance>,
     graphics_pipeline: Option<GraphicsPipelineContext>,
     width: f32,
     height: f32,
@@ -46,7 +50,7 @@ impl Renderer {
 
         Self {
             context,
-            geometry: None,
+            models: vec![],
             graphics_pipeline: None,
             width: width as f32,
             height: height as f32,
@@ -58,7 +62,7 @@ impl Renderer {
         let geometry_instance = GeometryInstanceBuilder::new(&self.context)
             .with_model(&model)
             .build();
-        self.geometry = Some(geometry_instance);
+        self.models.push(geometry_instance);
 
         let material_buffer = self
             .context
@@ -77,6 +81,8 @@ impl Renderer {
             .unwrap();
 
         self.graphics_pipeline = Some(graphics_pipeline);
+
+        //        self.create_bottom_level_as();
     }
 
     pub fn set_clear_value(&mut self, clear_value: glm::Vec4) {
@@ -84,11 +90,10 @@ impl Renderer {
     }
 
     pub fn draw_frame(&mut self) {
-        self.geometry.as_ref().expect("No model loaded, exiting");
         self.update_uniform_buffer();
 
-        let vertex_buffer = self.geometry.as_ref().unwrap().vertex_buffer.get();
-        let index_buffer = self.geometry.as_ref().unwrap().index_buffer.get();
+        let vertex_buffer = self.models[0].vertex_buffer.get();
+        let index_buffer = self.models[0].index_buffer.get();
         let graphics_pipeline = self.graphics_pipeline.as_ref().unwrap();
         let command_buffer = self.context.get_current_command_buffer();
 
@@ -126,5 +131,27 @@ impl Renderer {
             .unwrap()
             .update_uniform_buffer(ubo)
             .unwrap();
+    }
+
+    fn create_bottom_level_as(&self) -> AccelerationStructure {
+        let mut bottom_level_as = Vec::with_capacity(self.models.len());
+        for model in self.models.iter() {
+            let blas = BottomLevelAccelerationStructureBuilder::new()
+                .with_vertex_buffer(model.vertex_buffer.get())
+                .with_vertex_offset(model.vertex_offset)
+                .with_vertex_count(model.vertex_count as u32)
+                .with_vertex_size(mem::size_of::<Vertex>() as u32)
+                .with_index_buffer(model.index_buffer.get())
+                .with_index_offset(model.index_offset)
+                .with_index_count(model.index_count as u32)
+                .build();
+            bottom_level_as.push(blas);
+        }
+
+        AccelerationStructureBuilder::new(&self.context, self.graphics_pipeline.as_ref().unwrap())
+            .with_bottom_level_as(bottom_level_as)
+            //            .with_command_buffer()
+            .build()
+            .unwrap()
     }
 }

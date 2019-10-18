@@ -3,7 +3,71 @@ use ash::vk;
 use crate::errors::VulkanError;
 use crate::vulkan_context::VulkanContext;
 
-pub struct RayTracing;
+pub struct RayTracing {
+    ray_tracing: ash::extensions::nv::RayTracing,
+    ray_tracing_properties: vk::PhysicalDeviceRayTracingPropertiesNV,
+}
+
+impl RayTracing {
+    pub fn create_acceleration_structure(
+        &self,
+        info: &vk::AccelerationStructureCreateInfoNV,
+    ) -> Result<vk::AccelerationStructureNV, VulkanError> {
+        unsafe { self.ray_tracing.create_acceleration_structure(info, None) }
+            .map_err(|err| VulkanError::RayTracingError(err.to_string()))
+    }
+
+    pub fn destroy_acceleration_structure(
+        &self,
+        acceleration_structure: vk::AccelerationStructureNV,
+    ) {
+        unsafe {
+            self.ray_tracing
+                .destroy_acceleration_structure(acceleration_structure, None);
+        }
+    }
+
+    pub fn get_acceleration_structure_memory_requirements(
+        &self,
+        info: &vk::AccelerationStructureMemoryRequirementsInfoNV,
+    ) -> vk::MemoryRequirements2 {
+        unsafe {
+            self.ray_tracing
+                .get_acceleration_structure_memory_requirements(info)
+        }
+    }
+
+    pub fn bind_acceleration_structure_memory(
+        &self,
+        info: &[vk::BindAccelerationStructureMemoryInfoNV],
+    ) -> Result<(), VulkanError> {
+        unsafe { self.ray_tracing.bind_acceleration_structure_memory(info) }
+            .map_err(|err| VulkanError::RayTracingError(err.to_string()))
+    }
+
+    pub fn cmd_build_acceleration_structure(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        info: &vk::AccelerationStructureInfoNV,
+        acceleration_structure: vk::AccelerationStructureNV,
+        scratch_buffer: vk::Buffer,
+        scratch_offset: vk::DeviceSize,
+    ) {
+        unsafe {
+            self.ray_tracing.cmd_build_acceleration_structure(
+                command_buffer,
+                info,
+                vk::Buffer::null(),
+                0,
+                false,
+                acceleration_structure,
+                vk::AccelerationStructureNV::null(),
+                scratch_buffer,
+                scratch_offset,
+            )
+        }
+    }
+}
 
 pub struct RayTracingBuilder<'a> {
     context: &'a VulkanContext,
@@ -15,20 +79,27 @@ impl<'a> RayTracingBuilder<'a> {
     }
 
     pub fn build(self) -> Result<RayTracing, VulkanError> {
-        let mut raytracing_properties = vk::PhysicalDeviceRayTracingPropertiesNV::builder()
+        let mut ray_tracing_properties = vk::PhysicalDeviceRayTracingPropertiesNV::builder()
             .max_recursion_depth(0)
             .shader_group_handle_size(0)
             .build();
 
         let mut props = vk::PhysicalDeviceProperties2::builder()
-            .push_next(&mut raytracing_properties)
+            .push_next(&mut ray_tracing_properties)
             .build();
 
-        let props = self
-            .context
+        self.context
             .instance
             .get_physical_device_properties2(self.context.physical_device, &mut props);
 
-        Ok(RayTracing)
+        let ray_tracing = ash::extensions::nv::RayTracing::new(
+            self.context.instance.get(),
+            self.context.device.get(),
+        );
+
+        Ok(RayTracing {
+            ray_tracing,
+            ray_tracing_properties,
+        })
     }
 }

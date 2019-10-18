@@ -29,6 +29,10 @@ impl Drop for Device {
 }
 
 impl Device {
+    pub fn get(&self) -> &ash::Device {
+        &self.device
+    }
+
     pub fn queue(&self) -> vk::Queue {
         self.queue
     }
@@ -494,7 +498,7 @@ pub struct DeviceBuilder<'a> {
     instance: Rc<Instance>,
     physical_device: PhysicalDevice,
     queue_family: QueueFamily,
-    extensions: Option<&'a Vec<DeviceExtensions>>,
+    extensions: Option<&'a [DeviceExtensions]>,
 }
 
 impl<'a> DeviceBuilder<'a> {
@@ -511,7 +515,7 @@ impl<'a> DeviceBuilder<'a> {
         }
     }
 
-    pub fn with_extensions(mut self, extensions: &'a Vec<DeviceExtensions>) -> Self {
+    pub fn with_extensions(mut self, extensions: &'a [DeviceExtensions]) -> Self {
         self.extensions = Some(extensions);
         self
     }
