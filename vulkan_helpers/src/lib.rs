@@ -4,8 +4,8 @@ pub mod pipeline_context;
 pub mod vertex;
 pub mod vulkan_context;
 pub mod images;
+pub mod buffer;
 
-mod buffer;
 mod command_buffers;
 mod depth_resources;
 mod descriptor_pool;
@@ -26,3 +26,5 @@ mod surface;
 mod surface_format;
 mod swapchain;
 mod texture;
+mod ray_tracing;
+mod acceleration_structure;

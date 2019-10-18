@@ -57,18 +57,18 @@ impl<'a> DescriptorSetLayoutBuilder<'a> {
             .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
             .build();
 
-        //        let sampler_layout_binding = vk::DescriptorSetLayoutBinding::builder()
-        //            .binding(2)
-        //            .descriptor_count(self.texture_count)
-        //            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        //            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
-        //            .build();
+        let sampler_layout_binding = vk::DescriptorSetLayoutBinding::builder()
+            .binding(2)
+            .descriptor_count(self.texture_count)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+            .build();
 
         let layout_info = vk::DescriptorSetLayoutCreateInfo::builder()
             .bindings(&[
                 ubo_layout_binding,
                 ubo_mat_color_layout_binding,
-                //                sampler_layout_binding,
+                sampler_layout_binding,
             ])
             .build();
 

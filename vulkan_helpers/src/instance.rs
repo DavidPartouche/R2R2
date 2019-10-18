@@ -1,13 +1,15 @@
 use std::ffi::CStr;
+use std::mem;
 use std::os::raw::c_void;
 use std::ptr::null;
 
 use ash::extensions::{ext, khr};
-use ash::version::{EntryV1_0, InstanceV1_0};
+use ash::version::{EntryV1_0, InstanceV1_0, InstanceV1_1};
 use ash::vk;
+use ash::vk::PhysicalDeviceProperties2;
 
 use crate::errors::VulkanError;
-use crate::extensions::{DeviceExtensions, InstanceExtensions};
+use crate::extensions::DeviceExtensions;
 
 pub struct Instance {
     entry: ash::Entry,
@@ -97,6 +99,17 @@ impl Instance {
         device: vk::PhysicalDevice,
     ) -> vk::PhysicalDeviceMemoryProperties {
         unsafe { self.instance.get_physical_device_memory_properties(device) }
+    }
+
+    pub fn get_physical_device_properties2(
+        &self,
+        device: vk::PhysicalDevice,
+        prop: &mut PhysicalDeviceProperties2,
+    ) -> vk::PhysicalDeviceProperties2 {
+        unsafe {
+            self.instance.get_physical_device_properties2(device, prop);
+            *prop
+        }
     }
 
     pub fn create_device(
@@ -229,9 +242,6 @@ impl InstanceBuilder {
         let mut extensions = vec![
             khr::Surface::name().as_ptr(),
             khr::Win32Surface::name().as_ptr(),
-            InstanceExtensions::KhrGetPhysicalDeviceProperties2
-                .name()
-                .as_ptr(),
         ];
 
         if self.debug {

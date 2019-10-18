@@ -8,6 +8,7 @@ use vulkan_helpers::extensions::DeviceExtensions;
 use vulkan_helpers::pipeline_context::{GraphicsPipelineContext, GraphicsPipelineContextBuilder};
 use vulkan_helpers::vulkan_context::{VulkanContext, VulkanContextBuilder};
 
+use crate::geometry_instance::{GeometryInstance, GeometryInstanceBuilder};
 use crate::model::Model;
 
 #[repr(C, packed)]
@@ -20,6 +21,7 @@ struct UniformBufferObject {
 
 pub struct Renderer {
     context: VulkanContext,
+    geometry: Option<GeometryInstance>,
     graphics_pipeline: Option<GraphicsPipelineContext>,
     width: f32,
     height: f32,
@@ -29,9 +31,8 @@ impl Renderer {
     pub fn new(debug: bool, hwnd: *const c_void, width: u32, height: u32) -> Self {
         let extensions = vec![
             DeviceExtensions::ExtDescriptorIndexing,
-            DeviceExtensions::KhrMaintenance3,
             DeviceExtensions::KhrSwapchain,
-            //            ExtensionProperties::NvRayTracing,
+            DeviceExtensions::NvRayTracing,
         ];
         let context = VulkanContextBuilder::new()
             .with_debug_enabled(debug)
@@ -45,6 +46,7 @@ impl Renderer {
 
         Self {
             context,
+            geometry: None,
             graphics_pipeline: None,
             width: width as f32,
             height: height as f32,
@@ -53,8 +55,11 @@ impl Renderer {
 
     pub fn load_model(&mut self, filename: &Path) {
         let model = Model::new(filename);
-        let vertex_buffer = self.context.create_vertex_buffer(&model.vertices).unwrap();
-        let index_buffer = self.context.create_index_buffer(&model.indices).unwrap();
+        let geometry_instance = GeometryInstanceBuilder::new(&self.context)
+            .with_model(&model)
+            .build();
+        self.geometry = Some(geometry_instance);
+
         let material_buffer = self
             .context
             .create_material_buffer(&model.materials)
@@ -65,8 +70,6 @@ impl Renderer {
             .with_vertex_shader(Path::new("assets/shaders/vert_shader.spv"))
             .with_fragment_shader(Path::new("assets/shaders/frag_shader.spv"))
             .with_ubo_size(mem::size_of::<UniformBufferObject>())
-            .with_vertex_buffer(vertex_buffer)
-            .with_index_buffer(index_buffer)
             .with_material_buffer(material_buffer)
             .with_textures(textures)
             .with_indices_count(model.indices.len())
@@ -81,15 +84,18 @@ impl Renderer {
     }
 
     pub fn draw_frame(&mut self) {
+        self.geometry.as_ref().expect("No model loaded, exiting");
         self.update_uniform_buffer();
+
+        let vertex_buffer = self.geometry.as_ref().unwrap().vertex_buffer.get();
+        let index_buffer = self.geometry.as_ref().unwrap().index_buffer.get();
+        let graphics_pipeline = self.graphics_pipeline.as_ref().unwrap();
+        let command_buffer = self.context.get_current_command_buffer();
 
         self.context.frame_begin().unwrap();
 
         self.context.begin_render_pass();
-        self.graphics_pipeline
-            .as_ref()
-            .unwrap()
-            .draw(self.context.get_current_command_buffer());
+        graphics_pipeline.draw(command_buffer, vertex_buffer, index_buffer);
         self.context.end_render_pass();
 
         self.context.frame_end().unwrap();

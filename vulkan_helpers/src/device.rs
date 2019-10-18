@@ -534,15 +534,16 @@ impl<'a> DeviceBuilder<'a> {
         let mut desc_index_features = PhysicalDeviceDescriptorIndexingFeaturesEXT::builder()
             .runtime_descriptor_array(true)
             .build();
-        let mut supported_features = vk::PhysicalDeviceFeatures2::builder();
-        supported_features.p_next = &mut desc_index_features as *mut _ as *mut c_void;
-        supported_features.features.sampler_anisotropy = vk::TRUE;
-        supported_features.features.fragment_stores_and_atomics = vk::TRUE;
+
+        let supported_features = vk::PhysicalDeviceFeatures::builder()
+            .sampler_anisotropy(true)
+            .fragment_stores_and_atomics(true)
+            .build();
 
         let create_info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(&[queue_info])
             .enabled_extension_names(&extension_names)
-            .enabled_features(&supported_features.features)
+            .enabled_features(&supported_features)
             .push_next(&mut desc_index_features)
             .build();
 

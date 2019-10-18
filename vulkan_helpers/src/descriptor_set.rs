@@ -34,7 +34,7 @@ pub struct DescriptorSetBuilder<'a> {
     descriptor_set_layout: &'a DescriptorSetLayout,
     uniform_buffer: Option<&'a Buffer>,
     mat_color_buffer: Option<&'a Buffer>,
-    textures: Vec<Texture>,
+    textures: Option<&'a [Texture]>,
 }
 
 impl<'a> DescriptorSetBuilder<'a> {
@@ -44,7 +44,7 @@ impl<'a> DescriptorSetBuilder<'a> {
             descriptor_set_layout,
             uniform_buffer: None,
             mat_color_buffer: None,
-            textures: vec![],
+            textures: None,
         }
     }
 
@@ -58,8 +58,8 @@ impl<'a> DescriptorSetBuilder<'a> {
         self
     }
 
-    pub fn with_textures(mut self, textures: Vec<Texture>) -> Self {
-        self.textures = textures;
+    pub fn with_textures(mut self, textures: &'a [Texture]) -> Self {
+        self.textures = Some(textures);
         self
     }
 
@@ -83,15 +83,15 @@ impl<'a> DescriptorSetBuilder<'a> {
             .range(vk::WHOLE_SIZE)
             .build();
 
-        //        let mut image_infos = vec![];
-        //        for texture in self.textures {
-        //            let image_info = vk::DescriptorImageInfo::builder()
-        //                .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-        //                .image_view(texture.get_image_view())
-        //                .sampler(texture.get_sampler())
-        //                .build();
-        //            image_infos.push(image_info);
-        //        }
+        let mut image_infos = vec![];
+        for texture in self.textures.unwrap() {
+            let image_info = vk::DescriptorImageInfo::builder()
+                .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                .image_view(texture.get_image_view())
+                .sampler(texture.get_sampler())
+                .build();
+            image_infos.push(image_info);
+        }
 
         let uniform_wds = vk::WriteDescriptorSet::builder()
             .dst_set(descriptor_set)
@@ -109,17 +109,17 @@ impl<'a> DescriptorSetBuilder<'a> {
             .buffer_info(&[mat_color_buffer_info])
             .build();
 
-        //        let textures_wds = vk::WriteDescriptorSet::builder()
-        //            .dst_set(descriptor_set)
-        //            .dst_array_element(0)
-        //            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        //            .dst_binding(2)
-        //            .image_info(image_infos.as_slice())
-        //            .build();
+        let textures_wds = vk::WriteDescriptorSet::builder()
+            .dst_set(descriptor_set)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .dst_binding(2)
+            .image_info(image_infos.as_slice())
+            .build();
 
         self.context
             .device
-            .update_descriptor_sets(&[uniform_wds, material_wds]);
+            .update_descriptor_sets(&[uniform_wds, material_wds, textures_wds]);
 
         Ok(DescriptorSet {
             device: Rc::clone(&self.context.device),

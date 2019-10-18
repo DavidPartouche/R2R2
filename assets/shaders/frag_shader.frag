@@ -24,7 +24,7 @@ const int sizeofMat = 5;
 layout(binding = 1) buffer MatColorBufferObject { vec4[] m; }
 materials;
 
-//layout(binding = 2) uniform sampler2D[] textureSamplers;
+layout(binding = 2) uniform sampler2D[] textureSamplers;
 
 WaveFrontMaterial unpackMaterial()
 {
@@ -59,8 +59,8 @@ void main()
 
     WaveFrontMaterial m = unpackMaterial();
     vec3 c = m.diffuse;
-    //    if (m.textureId >= 0)
-    //    c *= texture(textureSamplers[m.textureId], fragTexCoord).xyz;
+    if (m.textureId >= 0)
+    c *= texture(textureSamplers[m.textureId], fragTexCoord).xyz;
     c *= dot_product;
 
     outColor = vec4(c, 1);

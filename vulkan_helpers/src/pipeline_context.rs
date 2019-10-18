@@ -10,18 +10,19 @@ use crate::descriptor_set_layout::{DescriptorSetLayout, DescriptorSetLayoutBuild
 use crate::device::Device;
 use crate::errors::VulkanError;
 use crate::pipeline::{Pipeline, PipelineBuilder};
+use crate::ray_tracing::{RayTracing, RayTracingBuilder};
 use crate::texture::Texture;
 use crate::vulkan_context::VulkanContext;
 
 pub struct GraphicsPipelineContext {
     device: Rc<Device>,
     uniform_buffer: Buffer,
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
     material_buffer: Buffer,
+    textures: Vec<Texture>,
     descriptor_set: DescriptorSet,
     graphics_pipeline: Pipeline,
     descriptor_set_layout: DescriptorSetLayout,
+    ray_tracing: RayTracing,
     indices_count: u32,
 }
 
@@ -36,7 +37,12 @@ impl GraphicsPipelineContext {
         self.uniform_buffer.copy_data(ubo)
     }
 
-    pub fn draw(&self, command_buffer: vk::CommandBuffer) {
+    pub fn draw(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        vertex_buffer: vk::Buffer,
+        index_buffer: vk::Buffer,
+    ) {
         self.device
             .cmd_bind_pipeline(command_buffer, self.graphics_pipeline.get());
         self.device.cmd_bind_descriptor_sets(
@@ -45,9 +51,9 @@ impl GraphicsPipelineContext {
             &[self.descriptor_set.get()],
         );
         self.device
-            .cmd_bind_vertex_buffers(command_buffer, &[self.vertex_buffer.get()]);
+            .cmd_bind_vertex_buffers(command_buffer, &[vertex_buffer]);
         self.device
-            .cmd_bind_index_buffer(command_buffer, self.index_buffer.get());
+            .cmd_bind_index_buffer(command_buffer, index_buffer);
         self.device
             .cmd_draw_indexed(command_buffer, self.indices_count);
 
@@ -59,8 +65,6 @@ pub struct GraphicsPipelineContextBuilder<'a> {
     context: &'a VulkanContext,
     vertex_shader: Option<&'a Path>,
     fragment_shader: Option<&'a Path>,
-    vertex_buffer: Option<Buffer>,
-    index_buffer: Option<Buffer>,
     material_buffer: Option<Buffer>,
     textures: Vec<Texture>,
     ubo_size: usize,
@@ -73,8 +77,6 @@ impl<'a> GraphicsPipelineContextBuilder<'a> {
             context,
             vertex_shader: None,
             fragment_shader: None,
-            vertex_buffer: None,
-            index_buffer: None,
             material_buffer: None,
             textures: vec![],
             ubo_size: 0,
@@ -94,16 +96,6 @@ impl<'a> GraphicsPipelineContextBuilder<'a> {
 
     pub fn with_ubo_size(mut self, size: usize) -> Self {
         self.ubo_size = size;
-        self
-    }
-
-    pub fn with_vertex_buffer(mut self, vertex_buffer: Buffer) -> Self {
-        self.vertex_buffer = Some(vertex_buffer);
-        self
-    }
-
-    pub fn with_index_buffer(mut self, index_buffer: Buffer) -> Self {
-        self.index_buffer = Some(index_buffer);
         self
     }
 
@@ -144,20 +136,22 @@ impl<'a> GraphicsPipelineContextBuilder<'a> {
         let descriptor_set = DescriptorSetBuilder::new(self.context, &descriptor_set_layout)
             .with_uniform_buffer(&uniform_buffer)
             .with_material_buffer(&material_buffer)
-            .with_textures(self.textures)
+            .with_textures(&self.textures)
             .build()
             .unwrap();
+
+        let ray_tracing = RayTracingBuilder::new(self.context).build()?;
 
         Ok(GraphicsPipelineContext {
             device: Rc::clone(&self.context.device),
             descriptor_set_layout,
             graphics_pipeline,
             uniform_buffer,
-            vertex_buffer: self.vertex_buffer.unwrap(),
-            index_buffer: self.index_buffer.unwrap(),
             material_buffer,
+            textures: self.textures,
             indices_count: self.indices_count as u32,
             descriptor_set,
+            ray_tracing,
         })
     }
 }
