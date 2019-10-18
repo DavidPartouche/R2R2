@@ -38,10 +38,6 @@ impl Model {
                 texture_id,
                 ..Material::default()
             };
-            println!(
-                "Diffuse material [{} {} {}]",
-                material.diffuse[0], material.diffuse[1], material.diffuse[2]
-            );
             materials.push(material);
         }
 
@@ -66,7 +62,6 @@ impl Model {
                         model.mesh.normals[3 * v + 1],
                         model.mesh.normals[3 * v + 2],
                     ],
-                    color: [0.0, 1.0, 1.0],
                     tex_coord: [
                         model.mesh.texcoords[2 * v],
                         1.0 - model.mesh.texcoords[2 * v + 1],
