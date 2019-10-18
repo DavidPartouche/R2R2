@@ -139,14 +139,14 @@ impl<'a> SwapchainBuilder<'a> {
         let swapchain = unsafe { swapchain_loader.create_swapchain(&info, None) }
             .map_err(|err| VulkanError::SwapchainCreationError(err.to_string()))?;
 
-        let back_buffer = unsafe { swapchain_loader.get_swapchain_images(swapchain) }
+        let back_buffers = unsafe { swapchain_loader.get_swapchain_images(swapchain) }
             .map_err(|err| VulkanError::SwapchainCreationError(err.to_string()))?;
 
         Ok(Swapchain {
             device: self.device,
             swapchain_loader,
             swapchain,
-            back_buffers: back_buffer,
+            back_buffers,
         })
     }
 }

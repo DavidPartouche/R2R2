@@ -45,30 +45,30 @@ impl<'a> DescriptorSetLayoutBuilder<'a> {
     pub fn build(self) -> Result<DescriptorSetLayout, VulkanError> {
         let ubo_layout_binding = vk::DescriptorSetLayoutBinding::builder()
             .binding(0)
-            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
             .descriptor_count(1)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
             .stage_flags(vk::ShaderStageFlags::VERTEX)
             .build();
 
         let ubo_mat_color_layout_binding = vk::DescriptorSetLayoutBinding::builder()
             .binding(1)
-            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
             .descriptor_count(1)
+            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
             .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
             .build();
 
-        let sampler_layout_binding = vk::DescriptorSetLayoutBinding::builder()
-            .binding(2)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .descriptor_count(self.texture_count)
-            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
-            .build();
+        //        let sampler_layout_binding = vk::DescriptorSetLayoutBinding::builder()
+        //            .binding(2)
+        //            .descriptor_count(self.texture_count)
+        //            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        //            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+        //            .build();
 
         let layout_info = vk::DescriptorSetLayoutCreateInfo::builder()
             .bindings(&[
                 ubo_layout_binding,
                 ubo_mat_color_layout_binding,
-                sampler_layout_binding,
+                //                sampler_layout_binding,
             ])
             .build();
 

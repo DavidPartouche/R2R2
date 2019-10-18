@@ -1,7 +1,7 @@
 use ash::vk;
 
 use crate::errors::VulkanError;
-use crate::extensions::ExtensionProperties;
+use crate::extensions::DeviceExtensions;
 use crate::instance::Instance;
 use crate::surface::Surface;
 
@@ -21,7 +21,7 @@ pub type PhysicalDevice = vk::PhysicalDevice;
 pub struct PhysicalDeviceBuilder<'a> {
     instance: &'a Instance,
     surface: &'a Surface,
-    extensions: Option<&'a Vec<ExtensionProperties>>,
+    extensions: Option<&'a Vec<DeviceExtensions>>,
 }
 
 impl<'a> PhysicalDeviceBuilder<'a> {
@@ -33,7 +33,7 @@ impl<'a> PhysicalDeviceBuilder<'a> {
         }
     }
 
-    pub fn with_extensions(mut self, extensions: &'a Vec<ExtensionProperties>) -> Self {
+    pub fn with_extensions(mut self, extensions: &'a Vec<DeviceExtensions>) -> Self {
         self.extensions = Some(extensions);
         self
     }
@@ -75,7 +75,9 @@ impl<'a> PhysicalDeviceBuilder<'a> {
         let mut graphics_family = None;
         let mut present_family = None;
         for (index, queue_family) in queue_families.iter().enumerate() {
-            if queue_family.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
+            if queue_family.queue_count > 0
+                && queue_family.queue_flags.contains(vk::QueueFlags::GRAPHICS)
+            {
                 graphics_family = Some(index);
             }
 

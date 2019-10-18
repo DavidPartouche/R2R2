@@ -1,12 +1,13 @@
-use std::os::raw::c_char;
+use std::os::raw::{c_char, c_void};
 use std::rc::Rc;
 
 use ash::extensions::khr;
 use ash::version::DeviceV1_0;
 use ash::vk;
+use ash::vk::PhysicalDeviceDescriptorIndexingFeaturesEXT;
 
 use crate::errors::VulkanError;
-use crate::extensions::ExtensionProperties;
+use crate::extensions::DeviceExtensions;
 use crate::instance::Instance;
 use crate::physical_device::PhysicalDevice;
 use crate::queue_family::QueueFamily;
@@ -306,6 +307,17 @@ impl Device {
         unsafe { self.device.update_descriptor_sets(descriptor_writes, &[]) }
     }
 
+    pub fn create_sampler(&self, info: &vk::SamplerCreateInfo) -> Result<vk::Sampler, VulkanError> {
+        unsafe { self.device.create_sampler(info, None) }
+            .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn destroy_sampler(&self, sampler: vk::Sampler) {
+        unsafe {
+            self.device.destroy_sampler(sampler, None);
+        }
+    }
+
     pub fn begin_command_buffer(
         &self,
         command_buffer: vk::CommandBuffer,
@@ -383,13 +395,106 @@ impl Device {
                 .cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, pipeline)
         }
     }
+
+    pub fn cmd_bind_descriptor_sets(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        pipeline_layout: vk::PipelineLayout,
+        descriptor_sets: &[vk::DescriptorSet],
+    ) {
+        unsafe {
+            self.device.cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                pipeline_layout,
+                0,
+                descriptor_sets,
+                &[],
+            );
+        }
+    }
+
+    pub fn cmd_bind_vertex_buffers(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        buffers: &[vk::Buffer],
+    ) {
+        unsafe {
+            self.device
+                .cmd_bind_vertex_buffers(command_buffer, 0, buffers, &[0]);
+        }
+    }
+
+    pub fn cmd_bind_index_buffer(&self, command_buffer: vk::CommandBuffer, buffer: vk::Buffer) {
+        unsafe {
+            self.device
+                .cmd_bind_index_buffer(command_buffer, buffer, 0, vk::IndexType::UINT32);
+        }
+    }
+
+    pub fn cmd_draw_indexed(&self, command_buffer: vk::CommandBuffer, indices_count: u32) {
+        unsafe {
+            self.device
+                .cmd_draw_indexed(command_buffer, indices_count, 1, 0, 0, 0);
+        }
+    }
+
+    pub fn cmd_copy_buffer(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        src_buffer: vk::Buffer,
+        dst_buffer: vk::Buffer,
+        copy_regions: &[vk::BufferCopy],
+    ) {
+        unsafe {
+            self.device
+                .cmd_copy_buffer(command_buffer, src_buffer, dst_buffer, copy_regions);
+        }
+    }
+
+    pub fn cmd_copy_buffer_to_image(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        buffer: vk::Buffer,
+        image: vk::Image,
+        image_layout: vk::ImageLayout,
+        regions: &[vk::BufferImageCopy],
+    ) {
+        unsafe {
+            self.device.cmd_copy_buffer_to_image(
+                command_buffer,
+                buffer,
+                image,
+                image_layout,
+                regions,
+            );
+        }
+    }
+
+    pub fn map_memory(
+        &self,
+        memory: vk::DeviceMemory,
+        size: vk::DeviceSize,
+    ) -> Result<*mut c_void, VulkanError> {
+        unsafe {
+            self.device
+                .map_memory(memory, 0, size, vk::MemoryMapFlags::empty())
+        }
+        .map_err(|err| VulkanError::DeviceError(err.to_string()))
+    }
+
+    pub fn unmap_memory(&self, memory: vk::DeviceMemory) {
+        unsafe {
+            self.device.unmap_memory(memory);
+        }
+    }
 }
 
 pub struct DeviceBuilder<'a> {
     instance: Rc<Instance>,
     physical_device: PhysicalDevice,
     queue_family: QueueFamily,
-    extensions: Option<&'a Vec<ExtensionProperties>>,
+    extensions: Option<&'a Vec<DeviceExtensions>>,
 }
 
 impl<'a> DeviceBuilder<'a> {
@@ -406,7 +511,7 @@ impl<'a> DeviceBuilder<'a> {
         }
     }
 
-    pub fn with_extensions(mut self, extensions: &'a Vec<ExtensionProperties>) -> Self {
+    pub fn with_extensions(mut self, extensions: &'a Vec<DeviceExtensions>) -> Self {
         self.extensions = Some(extensions);
         self
     }
@@ -426,14 +531,19 @@ impl<'a> DeviceBuilder<'a> {
             .map(|extension| extension.name().as_ptr())
             .collect();
 
-        let supported_features = vk::PhysicalDeviceFeatures::builder()
-            .sampler_anisotropy(true)
+        let mut desc_index_features = PhysicalDeviceDescriptorIndexingFeaturesEXT::builder()
+            .runtime_descriptor_array(true)
             .build();
+        let mut supported_features = vk::PhysicalDeviceFeatures2::builder();
+        supported_features.p_next = &mut desc_index_features as *mut _ as *mut c_void;
+        supported_features.features.sampler_anisotropy = vk::TRUE;
+        supported_features.features.fragment_stores_and_atomics = vk::TRUE;
 
         let create_info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(&[queue_info])
             .enabled_extension_names(&extension_names)
-            .enabled_features(&supported_features)
+            .enabled_features(&supported_features.features)
+            .push_next(&mut desc_index_features)
             .build();
 
         let device = self

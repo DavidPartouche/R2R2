@@ -7,7 +7,7 @@ use ash::version::{EntryV1_0, InstanceV1_0};
 use ash::vk;
 
 use crate::errors::VulkanError;
-use crate::extensions::ExtensionProperties;
+use crate::extensions::{DeviceExtensions, InstanceExtensions};
 
 pub struct Instance {
     entry: ash::Entry,
@@ -71,7 +71,7 @@ impl Instance {
     pub fn enumerate_device_extension_properties(
         &self,
         physical_device: vk::PhysicalDevice,
-    ) -> Result<Vec<ExtensionProperties>, VulkanError> {
+    ) -> Result<Vec<DeviceExtensions>, VulkanError> {
         Ok(unsafe {
             self.instance
                 .enumerate_device_extension_properties(physical_device)
@@ -80,7 +80,7 @@ impl Instance {
         .iter()
         .map(|property| {
             let name = unsafe { CStr::from_ptr(property.extension_name.as_ptr()) };
-            ExtensionProperties::from(name.to_str().unwrap())
+            DeviceExtensions::from(name.to_str().unwrap())
         })
         .collect())
     }
@@ -229,6 +229,9 @@ impl InstanceBuilder {
         let mut extensions = vec![
             khr::Surface::name().as_ptr(),
             khr::Win32Surface::name().as_ptr(),
+            InstanceExtensions::KhrGetPhysicalDeviceProperties2
+                .name()
+                .as_ptr(),
         ];
 
         if self.debug {

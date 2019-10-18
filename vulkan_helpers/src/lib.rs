@@ -1,6 +1,9 @@
 pub mod extensions;
+pub mod material;
 pub mod pipeline_context;
+pub mod vertex;
 pub mod vulkan_context;
+pub mod images;
 
 mod buffer;
 mod command_buffers;
@@ -22,4 +25,4 @@ mod shader_module;
 mod surface;
 mod surface_format;
 mod swapchain;
-mod vertex;
+mod texture;

@@ -16,6 +16,9 @@ pub enum VulkanError {
     SwapchainError(String),
     ShaderCreationError(String),
     VertexBufferCreationError(String),
+    ImageCreationError(String),
+    TextureCreationError(String),
+    GrahpicsPipelineCreationError(String),
 }
 
 impl Display for VulkanError {

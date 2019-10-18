@@ -41,6 +41,10 @@ impl CommandBuffers {
         self.command_buffers[index]
     }
 
+    pub fn get_present_complete_semaphore(&self, index: usize) -> vk::Semaphore {
+        self.present_complete_semaphores[index]
+    }
+
     pub fn get_render_complete_semaphore(&self, index: usize) -> vk::Semaphore {
         self.render_complete_semaphores[index]
     }
@@ -112,6 +116,19 @@ impl CommandBuffers {
             .build();
 
         self.device.queue_submit(&[info], self.fences[frame_index])
+    }
+
+    pub fn copy_buffer(
+        &self,
+        src_buffer: vk::Buffer,
+        dst_buffer: vk::Buffer,
+        size: vk::DeviceSize,
+    ) -> Result<(), VulkanError> {
+        let command_buffer = self.begin_single_time_commands()?;
+        let copy_region = vk::BufferCopy::builder().size(size).build();
+        self.device
+            .cmd_copy_buffer(command_buffer, src_buffer, dst_buffer, &[copy_region]);
+        self.end_single_time_commands(command_buffer)
     }
 }
 

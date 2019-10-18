@@ -28,6 +28,9 @@ impl Pipeline {
     pub fn get(&self) -> vk::Pipeline {
         self.graphics_pipeline
     }
+    pub fn get_layout(&self) -> vk::PipelineLayout {
+        self.pipeline_layout
+    }
 }
 
 pub struct PipelineBuilder<'a> {

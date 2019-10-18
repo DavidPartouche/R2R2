@@ -1,26 +1,31 @@
+use std::mem;
 use std::os::raw::c_void;
 use std::ptr::null;
 use std::rc::Rc;
 
 use ash::vk;
 
+use crate::buffer::{Buffer, BufferBuilder, BufferType};
 use crate::command_buffers::{CommandBuffers, CommandBuffersBuilder};
 use crate::depth_resources::{DepthResources, DepthResourcesBuilder};
 use crate::descriptor_pool::{DescriptorPool, DescriptorPoolBuilder};
 use crate::device::{Device, DeviceBuilder};
 use crate::errors::VulkanError;
-use crate::extensions::ExtensionProperties;
+use crate::extensions::DeviceExtensions;
 use crate::frame_buffer::{FrameBuffers, FrameBuffersBuilder};
 use crate::image_views::{ImageViews, ImageViewsBuilder};
+use crate::images::Image;
 use crate::instance::{Instance, InstanceBuilder};
+use crate::material::Material;
 use crate::physical_device::{PhysicalDevice, PhysicalDeviceBuilder};
-use crate::pipeline::Pipeline;
 use crate::present_mode::{PresentMode, PresentModeBuilder};
 use crate::queue_family::{QueueFamily, QueueFamilyBuilder};
 use crate::render_pass::{RenderPass, RenderPassBuilder};
 use crate::surface::{Surface, SurfaceBuilder};
 use crate::surface_format::{SurfaceFormat, SurfaceFormatBuilder};
 use crate::swapchain::{Swapchain, SwapchainBuilder};
+use crate::texture::{Texture, TextureBuilder};
+use crate::vertex::Vertex;
 
 pub struct VulkanContext {
     frame_buffers: FrameBuffers,
@@ -29,7 +34,7 @@ pub struct VulkanContext {
     pub(crate) render_pass: RenderPass,
     swapchain: Swapchain,
     pub(crate) descriptor_pool: Rc<DescriptorPool>,
-    command_buffers: CommandBuffers,
+    pub(crate) command_buffers: CommandBuffers,
     pub(crate) device: Rc<Device>,
     present_mode: PresentMode,
     surface_format: SurfaceFormat,
@@ -56,12 +61,84 @@ impl VulkanContext {
         self.clear_value = clear_value;
     }
 
+    pub fn create_vertex_buffer(&self, vertices: &[Vertex]) -> Result<Buffer, VulkanError> {
+        let size = (mem::size_of::<Vertex>() * vertices.len()) as vk::DeviceSize;
+        let vertices = vertices.as_ptr() as *const c_void;
+        self.create_buffer(BufferType::Vertex, size, vertices)
+    }
+
+    pub fn create_index_buffer(&self, indices: &[u32]) -> Result<Buffer, VulkanError> {
+        let size = (mem::size_of::<u32>() * indices.len()) as vk::DeviceSize;
+        let indices = indices.as_ptr() as *const c_void;
+        self.create_buffer(BufferType::Index, size, indices)
+    }
+
+    pub fn create_material_buffer(&self, materials: &[Material]) -> Result<Buffer, VulkanError> {
+        let size = (mem::size_of::<Material>() * materials.len()) as vk::DeviceSize;
+        let materials = materials.as_ptr() as *const c_void;
+
+        let mat_buffer = BufferBuilder::new(self)
+            .with_type(BufferType::Storage)
+            .with_size(size)
+            .build()?;
+        mat_buffer.copy_data(materials)?;
+
+        Ok(mat_buffer)
+    }
+
+    pub fn create_texture_images(&self, images: &Vec<Image>) -> Result<Vec<Texture>, VulkanError> {
+        let mut textures = vec![];
+
+        if images.is_empty() {
+            let image = Image {
+                pixels: vec![255, 0, 255, 255],
+                tex_width: 1,
+                tex_height: 1,
+                tex_channels: 1,
+            };
+
+            let texture = TextureBuilder::new(self).with_image(&image).build()?;
+            textures.push(texture);
+        }
+
+        for image in images {
+            let texture = TextureBuilder::new(self).with_image(image).build()?;
+            textures.push(texture);
+        }
+
+        Ok(textures)
+    }
+
+    pub fn create_buffer(
+        &self,
+        ty: BufferType,
+        size: vk::DeviceSize,
+        data: *const c_void,
+    ) -> Result<Buffer, VulkanError> {
+        let staging_buffer = BufferBuilder::new(self)
+            .with_type(BufferType::Staging)
+            .with_size(size)
+            .build()?;
+
+        staging_buffer.copy_data(data)?;
+
+        let buffer = BufferBuilder::new(self)
+            .with_type(ty)
+            .with_size(size)
+            .build()?;
+
+        self.command_buffers
+            .copy_buffer(staging_buffer.get(), buffer.get(), size)?;
+
+        Ok(buffer)
+    }
+
     pub fn frame_begin(&mut self) -> Result<(), VulkanError> {
         self.command_buffers.wait_for_fence(self.frame_index)?;
 
         self.image_index = self.swapchain.acquire_next_image(
             self.command_buffers
-                .get_render_complete_semaphore(self.frame_index),
+                .get_present_complete_semaphore(self.frame_index),
         )?;
 
         self.command_buffers.begin_command_buffer(self.frame_index)
@@ -116,14 +193,11 @@ impl VulkanContext {
     }
     pub fn end_render_pass(&self) {
         self.device
-            .cmd_next_subpass(self.command_buffers.get(self.frame_index));
-        self.device
             .cmd_end_render_pass(self.command_buffers.get(self.frame_index));
     }
 
-    pub fn draw(&self, pipeline: &Pipeline) {
-        self.device
-            .cmd_bind_pipeline(self.command_buffers.get(self.frame_index), pipeline.get());
+    pub fn get_current_command_buffer(&self) -> vk::CommandBuffer {
+        self.command_buffers.get(self.frame_index)
     }
 }
 
@@ -132,7 +206,7 @@ pub struct VulkanContextBuilder {
     hwnd: *const c_void,
     width: u32,
     height: u32,
-    extensions: Vec<ExtensionProperties>,
+    extensions: Vec<DeviceExtensions>,
     frames_count: usize,
 }
 
@@ -174,7 +248,7 @@ impl VulkanContextBuilder {
         self
     }
 
-    pub fn with_extensions(mut self, extensions: Vec<ExtensionProperties>) -> Self {
+    pub fn with_extensions(mut self, extensions: Vec<DeviceExtensions>) -> Self {
         self.extensions = extensions;
         self
     }
