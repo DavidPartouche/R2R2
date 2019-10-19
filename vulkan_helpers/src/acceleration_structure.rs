@@ -18,6 +18,7 @@ pub struct Instance {
     pub hit_group_index: u32,
 }
 
+// TODO: Change some values to u24
 #[repr(C, packed)]
 struct VulkanGeometryInstance {
     transform: [f32; 12],
@@ -53,8 +54,8 @@ pub struct AccelerationStructureBuilder<'a> {
     context: &'a VulkanContext,
     ray_tracing: Rc<RayTracing>,
     command_buffer: Option<vk::CommandBuffer>,
-    bottom_level_as: Option<&'a Vec<BottomLevelAccelerationStructure>>,
-    top_level_as: Option<&'a Vec<Instance>>,
+    bottom_level_as: Option<&'a [BottomLevelAccelerationStructure]>,
+    top_level_as: Option<&'a [Instance]>,
     allow_update: bool,
 }
 
@@ -72,13 +73,13 @@ impl<'a> AccelerationStructureBuilder<'a> {
 
     pub fn with_bottom_level_as(
         mut self,
-        bottom_level_as: &'a Vec<BottomLevelAccelerationStructure>,
+        bottom_level_as: &'a [BottomLevelAccelerationStructure],
     ) -> Self {
         self.bottom_level_as = Some(bottom_level_as);
         self
     }
 
-    pub fn with_top_level_as(mut self, instances: &'a Vec<Instance>) -> Self {
+    pub fn with_top_level_as(mut self, instances: &'a [Instance]) -> Self {
         self.top_level_as = Some(instances);
         self
     }
@@ -105,7 +106,7 @@ impl<'a> AccelerationStructureBuilder<'a> {
                 .ty(vk::AccelerationStructureTypeNV::BOTTOM_LEVEL)
                 .flags(flags)
                 .instance_count(0)
-                .geometries(self.bottom_level_as.unwrap().as_slice())
+                .geometries(self.bottom_level_as.unwrap())
                 .build()
         } else {
             vk::AccelerationStructureInfoNV::builder()
@@ -261,7 +262,7 @@ impl<'a> AccelerationStructureBuilder<'a> {
             vk::AccelerationStructureInfoNV::builder()
                 .flags(flags)
                 .ty(vk::AccelerationStructureTypeNV::BOTTOM_LEVEL)
-                .geometries(self.bottom_level_as.unwrap().as_slice())
+                .geometries(self.bottom_level_as.unwrap())
                 .instance_count(0)
                 .build()
         } else {

@@ -1,7 +1,9 @@
 use std::mem;
 use std::rc::Rc;
 
-use crate::acceleration_structure::{AccelerationStructureBuilder, Instance};
+use crate::acceleration_structure::{
+    AccelerationStructure, AccelerationStructureBuilder, Instance,
+};
 use crate::bottom_level_acceleration_structure::{
     BottomLevelAccelerationStructure, BottomLevelAccelerationStructureBuilder,
 };
@@ -12,6 +14,9 @@ use crate::vertex::Vertex;
 use crate::vulkan_context::VulkanContext;
 
 pub struct RayTracingPipeline {
+    top_level_as: AccelerationStructure,
+    bottom_level_as: Vec<AccelerationStructure>,
+    geometry_instances: Vec<GeometryInstance>,
     ray_tracing: Rc<RayTracing>,
 }
 
@@ -47,39 +52,58 @@ impl<'a> RayTracingPipelineBuilder<'a> {
             .with_vertices(&mut self.vertices)
             .with_indices(&mut self.indices)
             .build();
+        let geometry_instances = vec![geom];
 
-        self.create_acceleration_structures(Rc::clone(&ray_tracing), &geom);
+        let (bottom_level_as, top_level_as) =
+            self.create_acceleration_structures(Rc::clone(&ray_tracing), &geometry_instances)?;
 
-        Ok(RayTracingPipeline { ray_tracing })
+        Ok(RayTracingPipeline {
+            ray_tracing,
+            geometry_instances,
+            bottom_level_as,
+            top_level_as,
+        })
     }
 
-    fn create_acceleration_structures(&self, ray_tracing: Rc<RayTracing>, geom: &GeometryInstance) {
+    fn create_acceleration_structures(
+        &self,
+        ray_tracing: Rc<RayTracing>,
+        geometry_instances: &[GeometryInstance],
+    ) -> Result<(Vec<AccelerationStructure>, AccelerationStructure), VulkanError> {
         let command_buffer = self.context.begin_single_time_commands().unwrap();
+        let mut bottom_level_as = Vec::with_capacity(geometry_instances.len());
 
-        let bottom_level_as = vec![self.create_bottom_level_as(geom)];
-        let structure = AccelerationStructureBuilder::new(&self.context, Rc::clone(&ray_tracing))
-            .with_bottom_level_as(&bottom_level_as)
-            .with_command_buffer(command_buffer)
-            .build()
-            .unwrap();
+        for geom in geometry_instances {
+            let blas = self.create_bottom_level_as(geom);
+            let structure =
+                AccelerationStructureBuilder::new(&self.context, Rc::clone(&ray_tracing))
+                    .with_bottom_level_as(&[blas])
+                    .with_command_buffer(command_buffer)
+                    .build()?;
+            bottom_level_as.push(structure);
+        }
 
-        let instances: Vec<Instance> = vec![Instance {
-            bottom_level_as: structure.get(),
-            transform: geom.transform,
-            instance_id: 0,
-            hit_group_index: 0,
-        }];
+        let instances: Vec<Instance> = bottom_level_as
+            .iter()
+            .zip(geometry_instances.iter())
+            .enumerate()
+            .map(|(index, (blas, geom))| Instance {
+                bottom_level_as: blas.get(),
+                transform: geom.transform,
+                instance_id: index as u32,
+                hit_group_index: index as u32,
+            })
+            .collect();
 
         let top_level_as =
             AccelerationStructureBuilder::new(&self.context, Rc::clone(&ray_tracing))
                 .with_top_level_as(&instances)
                 .with_command_buffer(command_buffer)
-                .build()
-                .unwrap();
+                .build()?;
 
-        self.context
-            .end_single_time_commands(command_buffer)
-            .unwrap();
+        self.context.end_single_time_commands(command_buffer)?;
+
+        Ok((bottom_level_as, top_level_as))
     }
 
     fn create_bottom_level_as(&self, geom: &GeometryInstance) -> BottomLevelAccelerationStructure {
