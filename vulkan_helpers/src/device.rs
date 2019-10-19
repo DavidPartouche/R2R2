@@ -8,19 +8,19 @@ use ash::vk::PhysicalDeviceDescriptorIndexingFeaturesEXT;
 
 use crate::errors::VulkanError;
 use crate::extensions::DeviceExtensions;
-use crate::instance::Instance;
+use crate::instance::VulkanInstance;
 use crate::physical_device::PhysicalDevice;
 use crate::queue_family::QueueFamily;
 
 const FENCE_TIMEOUT: u64 = 100;
 
-pub struct Device {
-    instance: Rc<Instance>,
+pub struct VulkanDevice {
+    instance: Rc<VulkanInstance>,
     device: ash::Device,
     queue: vk::Queue,
 }
 
-impl Drop for Device {
+impl Drop for VulkanDevice {
     fn drop(&mut self) {
         unsafe {
             self.device.destroy_device(None);
@@ -28,7 +28,7 @@ impl Drop for Device {
     }
 }
 
-impl Device {
+impl VulkanDevice {
     pub fn get(&self) -> &ash::Device {
         &self.device
     }
@@ -494,20 +494,20 @@ impl Device {
     }
 }
 
-pub struct DeviceBuilder<'a> {
-    instance: Rc<Instance>,
+pub struct VulkanDeviceBuilder<'a> {
+    instance: Rc<VulkanInstance>,
     physical_device: PhysicalDevice,
     queue_family: QueueFamily,
     extensions: Option<&'a [DeviceExtensions]>,
 }
 
-impl<'a> DeviceBuilder<'a> {
+impl<'a> VulkanDeviceBuilder<'a> {
     pub fn new(
-        instance: Rc<Instance>,
+        instance: Rc<VulkanInstance>,
         physical_device: PhysicalDevice,
         queue_family: QueueFamily,
     ) -> Self {
-        DeviceBuilder {
+        VulkanDeviceBuilder {
             instance,
             physical_device,
             queue_family,
@@ -520,7 +520,7 @@ impl<'a> DeviceBuilder<'a> {
         self
     }
 
-    pub fn build(self) -> Result<Device, VulkanError> {
+    pub fn build(self) -> Result<VulkanDevice, VulkanError> {
         let queue_priority = [1.];
 
         let queue_info = vk::DeviceQueueCreateInfo::builder()
@@ -557,7 +557,7 @@ impl<'a> DeviceBuilder<'a> {
 
         let queue = unsafe { device.get_device_queue(self.queue_family, 0) };
 
-        Ok(Device {
+        Ok(VulkanDevice {
             instance: self.instance,
             device,
             queue,

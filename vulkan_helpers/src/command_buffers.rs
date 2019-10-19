@@ -2,12 +2,12 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 use crate::queue_family::QueueFamily;
 
 pub struct CommandBuffers {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     command_pools: Vec<vk::CommandPool>,
     command_buffers: Vec<vk::CommandBuffer>,
     fences: Vec<vk::Fence>,
@@ -49,10 +49,13 @@ impl CommandBuffers {
         self.render_complete_semaphores[index]
     }
 
-    pub fn begin_single_time_commands(&self) -> Result<vk::CommandBuffer, VulkanError> {
+    pub fn begin_single_time_commands(
+        &self,
+        frame_index: usize,
+    ) -> Result<vk::CommandBuffer, VulkanError> {
         let alloc_info = vk::CommandBufferAllocateInfo::builder()
             .level(vk::CommandBufferLevel::PRIMARY)
-            .command_pool(self.command_pools[0])
+            .command_pool(self.command_pools[frame_index])
             .command_buffer_count(1)
             .build();
         let command_buffer = self.device.allocate_command_buffers(&alloc_info)?[0];
@@ -69,6 +72,7 @@ impl CommandBuffers {
     pub fn end_single_time_commands(
         &self,
         command_buffer: vk::CommandBuffer,
+        frame_index: usize,
     ) -> Result<(), VulkanError> {
         self.device.end_command_buffer(command_buffer)?;
 
@@ -81,7 +85,7 @@ impl CommandBuffers {
         self.device.queue_wait_idle()?;
 
         self.device
-            .free_command_buffers(self.command_pools[0], &[command_buffer]);
+            .free_command_buffers(self.command_pools[frame_index], &[command_buffer]);
 
         Ok(())
     }
@@ -124,22 +128,22 @@ impl CommandBuffers {
         dst_buffer: vk::Buffer,
         size: vk::DeviceSize,
     ) -> Result<(), VulkanError> {
-        let command_buffer = self.begin_single_time_commands()?;
+        let command_buffer = self.begin_single_time_commands(0)?;
         let copy_region = vk::BufferCopy::builder().size(size).build();
         self.device
             .cmd_copy_buffer(command_buffer, src_buffer, dst_buffer, &[copy_region]);
-        self.end_single_time_commands(command_buffer)
+        self.end_single_time_commands(command_buffer, 0)
     }
 }
 
 pub struct CommandBuffersBuilder {
     queue_family: QueueFamily,
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     buffer_count: usize,
 }
 
 impl CommandBuffersBuilder {
-    pub fn new(queue_family: QueueFamily, device: Rc<Device>) -> Self {
+    pub fn new(queue_family: QueueFamily, device: Rc<VulkanDevice>) -> Self {
         Self {
             queue_family,
             device,

@@ -2,14 +2,14 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
-use crate::instance::Instance;
+use crate::instance::VulkanInstance;
 use crate::physical_device::PhysicalDevice;
 use crate::surface_format::SurfaceFormat;
 
 pub struct RenderPass {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     render_pass: vk::RenderPass,
 }
 
@@ -26,17 +26,17 @@ impl RenderPass {
 }
 
 pub struct RenderPassBuilder<'a> {
-    instance: &'a Instance,
+    instance: &'a VulkanInstance,
     physical_device: PhysicalDevice,
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     surface_format: SurfaceFormat,
 }
 
 impl<'a> RenderPassBuilder<'a> {
     pub fn new(
-        instance: &'a Instance,
+        instance: &'a VulkanInstance,
         physical_device: PhysicalDevice,
-        device: Rc<Device>,
+        device: Rc<VulkanDevice>,
         surface_format: SurfaceFormat,
     ) -> Self {
         RenderPassBuilder {

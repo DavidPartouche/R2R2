@@ -2,13 +2,13 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 use crate::surface_format::SurfaceFormat;
 use crate::swapchain::Swapchain;
 
 pub struct ImageViews {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     back_buffer_views: Vec<vk::ImageView>,
 }
 
@@ -27,14 +27,14 @@ impl ImageViews {
 }
 
 pub struct ImageViewsBuilder<'a> {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     surface_format: SurfaceFormat,
     swapchain: &'a Swapchain,
 }
 
 impl<'a> ImageViewsBuilder<'a> {
     pub fn new(
-        device: Rc<Device>,
+        device: Rc<VulkanDevice>,
         surface_format: SurfaceFormat,
         swapchain: &'a Swapchain,
     ) -> Self {

@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use vulkan_helpers::glm;
 use vulkan_helpers::images::Image;
 use vulkan_helpers::material::Material;
 use vulkan_helpers::vertex::Vertex;
@@ -29,9 +30,9 @@ impl Model {
             }
 
             let material = Material {
-                ambient: mat.ambient,
-                diffuse: mat.diffuse,
-                specular: mat.specular,
+                ambient: glm::make_vec3(&mat.ambient),
+                diffuse: glm::make_vec3(&mat.diffuse),
+                specular: glm::make_vec3(&mat.specular),
                 dissolve: mat.dissolve,
                 ior: mat.optical_density,
                 illum: mat.illumination_model.unwrap_or(0) as i32,
@@ -52,20 +53,20 @@ impl Model {
 
             for v in 0..model.mesh.positions.len() / 3 {
                 let vertex = Vertex {
-                    pos: [
+                    pos: glm::vec3(
                         model.mesh.positions[3 * v],
                         model.mesh.positions[3 * v + 1],
                         model.mesh.positions[3 * v + 2],
-                    ],
-                    nrm: [
+                    ),
+                    nrm: glm::vec3(
                         model.mesh.normals[3 * v],
                         model.mesh.normals[3 * v + 1],
                         model.mesh.normals[3 * v + 2],
-                    ],
-                    tex_coord: [
+                    ),
+                    tex_coord: glm::vec2(
                         model.mesh.texcoords[2 * v],
                         1.0 - model.mesh.texcoords[2 * v + 1],
-                    ],
+                    ),
                     mat_id: model.mesh.material_id.unwrap_or(0) as i32,
                 };
 

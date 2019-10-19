@@ -2,7 +2,7 @@ use ash::vk;
 
 use crate::errors::VulkanError;
 use crate::extensions::DeviceExtensions;
-use crate::instance::Instance;
+use crate::instance::VulkanInstance;
 use crate::surface::Surface;
 
 struct QueueFamilyIndices {
@@ -19,13 +19,13 @@ impl QueueFamilyIndices {
 pub type PhysicalDevice = vk::PhysicalDevice;
 
 pub struct PhysicalDeviceBuilder<'a> {
-    instance: &'a Instance,
+    instance: &'a VulkanInstance,
     surface: &'a Surface,
     extensions: Option<&'a Vec<DeviceExtensions>>,
 }
 
 impl<'a> PhysicalDeviceBuilder<'a> {
-    pub fn new(instance: &'a Instance, surface: &'a Surface) -> Self {
+    pub fn new(instance: &'a VulkanInstance, surface: &'a Surface) -> Self {
         PhysicalDeviceBuilder {
             instance,
             surface,

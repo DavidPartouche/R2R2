@@ -1,21 +1,21 @@
 use ash::vk;
 
 use crate::errors::VulkanError;
-use crate::instance::Instance;
+use crate::instance::VulkanInstance;
 use crate::physical_device::PhysicalDevice;
 use crate::surface::Surface;
 
 pub type QueueFamily = u32;
 
 pub struct QueueFamilyBuilder<'a> {
-    instance: &'a Instance,
+    instance: &'a VulkanInstance,
     surface: &'a Surface,
     physical_device: PhysicalDevice,
 }
 
 impl<'a> QueueFamilyBuilder<'a> {
     pub fn new(
-        instance: &'a Instance,
+        instance: &'a VulkanInstance,
         surface: &'a Surface,
         physical_device: PhysicalDevice,
     ) -> Self {

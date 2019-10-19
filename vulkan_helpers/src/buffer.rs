@@ -4,13 +4,14 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 use crate::vulkan_context::VulkanContext;
 
 pub enum BufferType {
     Index,
     RayTracing,
+    RayTracingInstance,
     Staging,
     Storage,
     Uniform,
@@ -18,7 +19,7 @@ pub enum BufferType {
 }
 
 pub struct Buffer {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     buffer: vk::Buffer,
     buffer_memory: vk::DeviceMemory,
     buffer_size: vk::DeviceSize,
@@ -84,6 +85,7 @@ impl<'a> BufferBuilder<'a> {
                 vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST
             }
             BufferType::RayTracing => vk::BufferUsageFlags::RAY_TRACING_NV,
+            BufferType::RayTracingInstance => vk::BufferUsageFlags::RAY_TRACING_NV,
             BufferType::Staging => vk::BufferUsageFlags::TRANSFER_SRC,
             BufferType::Storage => {
                 vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::TRANSFER_DST
@@ -97,6 +99,9 @@ impl<'a> BufferBuilder<'a> {
         let properties = match &self.ty {
             BufferType::Index => vk::MemoryPropertyFlags::DEVICE_LOCAL,
             BufferType::RayTracing => vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            BufferType::RayTracingInstance => {
+                vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT
+            }
             BufferType::Staging => {
                 vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT
             }

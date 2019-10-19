@@ -4,7 +4,7 @@ use ash::extensions::khr;
 use ash::vk;
 
 use crate::errors::VulkanError;
-use crate::instance::Instance;
+use crate::instance::VulkanInstance;
 
 pub struct SwapchainSupportDetails {
     pub capabilities: vk::SurfaceCapabilitiesKHR,
@@ -91,12 +91,12 @@ impl Surface {
 }
 
 pub struct SurfaceBuilder<'a> {
-    instance: &'a Instance,
+    instance: &'a VulkanInstance,
     hwnd: vk::HWND,
 }
 
 impl<'a> SurfaceBuilder<'a> {
-    pub fn new(instance: &'a Instance) -> Self {
+    pub fn new(instance: &'a VulkanInstance) -> Self {
         SurfaceBuilder {
             instance,
             hwnd: null(),

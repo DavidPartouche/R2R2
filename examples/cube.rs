@@ -1,8 +1,7 @@
 use std::path::Path;
 
-use nalgebra_glm as glm;
-
 use r2r2::application::ApplicationBuilder;
+use vulkan_helpers::glm;
 
 fn main() {
     let mut app = ApplicationBuilder::new().build();

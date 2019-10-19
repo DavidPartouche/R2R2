@@ -3,7 +3,7 @@ use std::rc::Rc;
 use ash::extensions::khr;
 use ash::vk;
 
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 use crate::physical_device::PhysicalDevice;
 use crate::present_mode::PresentMode;
@@ -11,7 +11,7 @@ use crate::surface::Surface;
 use crate::surface_format::SurfaceFormat;
 
 pub struct Swapchain {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     swapchain_loader: khr::Swapchain,
     swapchain: vk::SwapchainKHR,
     back_buffers: Vec<vk::Image>,
@@ -65,7 +65,7 @@ impl Swapchain {
 }
 
 pub struct SwapchainBuilder<'a> {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     surface: &'a Surface,
     physical_device: PhysicalDevice,
     surface_format: SurfaceFormat,
@@ -76,7 +76,7 @@ pub struct SwapchainBuilder<'a> {
 
 impl<'a> SwapchainBuilder<'a> {
     pub fn new(
-        device: Rc<Device>,
+        device: Rc<VulkanDevice>,
         surface: &'a Surface,
         physical_device: PhysicalDevice,
         surface_format: SurfaceFormat,

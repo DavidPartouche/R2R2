@@ -2,12 +2,12 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 use crate::vulkan_context::VulkanContext;
 
 pub struct DescriptorSetLayout {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     descriptor_set_layout: vk::DescriptorSetLayout,
 }
 

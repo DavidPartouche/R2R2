@@ -5,11 +5,11 @@ use std::rc::Rc;
 use ash::util::read_spv;
 use ash::vk;
 
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 
 pub struct ShaderModule {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     shader_module: vk::ShaderModule,
 }
 
@@ -26,12 +26,12 @@ impl ShaderModule {
 }
 
 pub struct ShaderModuleBuilder<'a> {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     path: Option<&'a Path>,
 }
 
 impl<'a> ShaderModuleBuilder<'a> {
-    pub fn new(device: Rc<Device>) -> Self {
+    pub fn new(device: Rc<VulkanDevice>) -> Self {
         ShaderModuleBuilder { device, path: None }
     }
 

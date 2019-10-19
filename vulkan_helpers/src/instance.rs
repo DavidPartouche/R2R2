@@ -10,14 +10,14 @@ use ash::vk::PhysicalDeviceProperties2;
 use crate::errors::VulkanError;
 use crate::extensions::DeviceExtensions;
 
-pub struct Instance {
+pub struct VulkanInstance {
     entry: ash::Entry,
     instance: ash::Instance,
     debug_utils: Option<ash::extensions::ext::DebugUtils>,
     messenger: Option<vk::DebugUtilsMessengerEXT>,
 }
 
-impl Drop for Instance {
+impl Drop for VulkanInstance {
     fn drop(&mut self) {
         unsafe {
             if let Some(debug_utils) = &self.debug_utils {
@@ -28,7 +28,7 @@ impl Drop for Instance {
     }
 }
 
-impl Instance {
+impl VulkanInstance {
     pub fn get(&self) -> &ash::Instance {
         &self.instance
     }
@@ -210,13 +210,13 @@ impl Instance {
     }
 }
 
-pub struct InstanceBuilder {
+pub struct VulkanInstanceBuilder {
     debug: bool,
 }
 
-impl InstanceBuilder {
+impl VulkanInstanceBuilder {
     pub fn new() -> Self {
-        InstanceBuilder { debug: false }
+        VulkanInstanceBuilder { debug: false }
     }
 
     pub fn with_debug_enabled(mut self, debug: bool) -> Self {
@@ -224,7 +224,7 @@ impl InstanceBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Instance, VulkanError> {
+    pub fn build(self) -> Result<VulkanInstance, VulkanError> {
         let name = CStr::from_bytes_with_nul(b"R2R2\0").unwrap();
         let version = ash::vk_make_version!(0, 1, 0);
         let api_version = ash::vk_make_version!(1, 1, 0);
@@ -264,7 +264,7 @@ impl InstanceBuilder {
             let debug_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
                 .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::all())
                 .message_type(vk::DebugUtilsMessageTypeFlagsEXT::all())
-                .pfn_user_callback(Some(Instance::vulkan_debug_callback))
+                .pfn_user_callback(Some(VulkanInstance::vulkan_debug_callback))
                 .build();
 
             let debug_utils = Some(ext::DebugUtils::new(&entry, &instance));
@@ -282,7 +282,7 @@ impl InstanceBuilder {
             (None, None)
         };
 
-        Ok(Instance {
+        Ok(VulkanInstance {
             entry,
             instance,
             debug_utils,

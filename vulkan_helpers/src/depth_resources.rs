@@ -3,14 +3,14 @@ use std::rc::Rc;
 use ash::vk;
 
 use crate::command_buffers::CommandBuffers;
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 use crate::images;
-use crate::instance::Instance;
+use crate::instance::VulkanInstance;
 use crate::physical_device::PhysicalDevice;
 
 pub struct DepthResources {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     depth_image: vk::Image,
     depth_image_memory: vk::DeviceMemory,
     depth_image_view: vk::ImageView,
@@ -31,9 +31,9 @@ impl DepthResources {
 }
 
 pub struct DepthResourcesBuilder<'a> {
-    instance: &'a Instance,
+    instance: &'a VulkanInstance,
     physical_device: PhysicalDevice,
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     command_buffers: &'a CommandBuffers,
     width: u32,
     height: u32,
@@ -41,9 +41,9 @@ pub struct DepthResourcesBuilder<'a> {
 
 impl<'a> DepthResourcesBuilder<'a> {
     pub fn new(
-        instance: &'a Instance,
+        instance: &'a VulkanInstance,
         physical_device: PhysicalDevice,
-        device: Rc<Device>,
+        device: Rc<VulkanDevice>,
         command_buffers: &'a CommandBuffers,
     ) -> Self {
         DepthResourcesBuilder {

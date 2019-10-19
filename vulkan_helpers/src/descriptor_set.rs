@@ -5,13 +5,13 @@ use ash::vk;
 use crate::buffer::Buffer;
 use crate::descriptor_pool::DescriptorPool;
 use crate::descriptor_set_layout::DescriptorSetLayout;
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 use crate::texture::Texture;
 use crate::vulkan_context::VulkanContext;
 
 pub struct DescriptorSet {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     descriptor_pool: Rc<DescriptorPool>,
     descriptor_set: vk::DescriptorSet,
 }

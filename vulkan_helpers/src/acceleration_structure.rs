@@ -1,18 +1,38 @@
+use std::os::raw::c_void;
 use std::rc::Rc;
+use std::{mem, ptr};
 
 use ash::vk;
 
+use crate::bottom_level_acceleration_structure::BottomLevelAccelerationStructure;
 use crate::buffer::{Buffer, BufferBuilder, BufferType};
 use crate::errors::VulkanError;
-use crate::pipeline_context::GraphicsPipelineContext;
+use crate::glm;
 use crate::ray_tracing::RayTracing;
 use crate::vulkan_context::VulkanContext;
+
+pub struct Instance {
+    pub bottom_level_as: vk::AccelerationStructureNV,
+    pub transform: glm::Mat4,
+    pub instance_id: u32,
+    pub hit_group_index: u32,
+}
+
+#[repr(C, packed)]
+struct VulkanGeometryInstance {
+    transform: [f32; 12],
+    instance_id: u32,
+    mask: u8,
+    instance_offset: u32,
+    flags: u32,
+    acceleration_structure_handle: u64,
+}
 
 pub struct AccelerationStructure {
     ray_tracing: Rc<RayTracing>,
     scratch_buffer: Buffer,
     result_buffer: Buffer,
-    //    instances_buffer: Buffer,
+    instances_buffer: Option<Buffer>,
     acc_structure: vk::AccelerationStructureNV,
 }
 
@@ -23,30 +43,43 @@ impl Drop for AccelerationStructure {
     }
 }
 
+impl AccelerationStructure {
+    pub fn get(&self) -> vk::AccelerationStructureNV {
+        self.acc_structure
+    }
+}
+
 pub struct AccelerationStructureBuilder<'a> {
     context: &'a VulkanContext,
-    pipeline_context: &'a GraphicsPipelineContext,
+    ray_tracing: Rc<RayTracing>,
     command_buffer: Option<vk::CommandBuffer>,
-    bottom_level_as: Vec<BottomLevelAccelerationStructure>,
+    bottom_level_as: Option<&'a Vec<BottomLevelAccelerationStructure>>,
+    top_level_as: Option<&'a Vec<Instance>>,
     allow_update: bool,
 }
 
 impl<'a> AccelerationStructureBuilder<'a> {
-    pub fn new(context: &'a VulkanContext, pipeline_context: &'a GraphicsPipelineContext) -> Self {
+    pub fn new(context: &'a VulkanContext, ray_tracing: Rc<RayTracing>) -> Self {
         AccelerationStructureBuilder {
             context,
-            pipeline_context,
+            ray_tracing,
             command_buffer: None,
-            bottom_level_as: vec![],
+            bottom_level_as: None,
+            top_level_as: None,
             allow_update: false,
         }
     }
 
     pub fn with_bottom_level_as(
         mut self,
-        bottom_level_as: Vec<BottomLevelAccelerationStructure>,
+        bottom_level_as: &'a Vec<BottomLevelAccelerationStructure>,
     ) -> Self {
-        self.bottom_level_as = bottom_level_as;
+        self.bottom_level_as = Some(bottom_level_as);
+        self
+    }
+
+    pub fn with_top_level_as(mut self, instances: &'a Vec<Instance>) -> Self {
+        self.top_level_as = Some(instances);
         self
     }
 
@@ -67,23 +100,39 @@ impl<'a> AccelerationStructureBuilder<'a> {
             vk::BuildAccelerationStructureFlagsNV::empty()
         };
 
-        let as_info = vk::AccelerationStructureInfoNV::builder()
-            .ty(vk::AccelerationStructureTypeNV::BOTTOM_LEVEL)
-            .flags(flags)
-            .instance_count(0)
-            .geometries(self.bottom_level_as.as_slice())
-            .build();
+        let as_info = if self.bottom_level_as.is_some() {
+            vk::AccelerationStructureInfoNV::builder()
+                .ty(vk::AccelerationStructureTypeNV::BOTTOM_LEVEL)
+                .flags(flags)
+                .instance_count(0)
+                .geometries(self.bottom_level_as.unwrap().as_slice())
+                .build()
+        } else {
+            vk::AccelerationStructureInfoNV::builder()
+                .ty(vk::AccelerationStructureTypeNV::TOP_LEVEL)
+                .flags(flags)
+                .instance_count(self.top_level_as.unwrap().len() as u32)
+                .geometries(&[])
+                .build()
+        };
+
         let as_create_info = vk::AccelerationStructureCreateInfoNV::builder()
             .info(as_info)
             .compacted_size(0)
             .build();
 
         let acc_structure = self
-            .pipeline_context
             .ray_tracing
             .create_acceleration_structure(&as_create_info)?;
 
         let (scratch_size, result_size) = self.compute_as_buffer_sizes(acc_structure);
+
+        let instances_size = if self.top_level_as.is_some() {
+            (self.top_level_as.unwrap().len() * mem::size_of::<VulkanGeometryInstance>())
+                as vk::DeviceSize
+        } else {
+            0
+        };
 
         let scratch_buffer = BufferBuilder::new(self.context)
             .with_type(BufferType::RayTracing)
@@ -95,13 +144,31 @@ impl<'a> AccelerationStructureBuilder<'a> {
             .with_size(result_size)
             .build()?;
 
-        self.generate(acc_structure, &scratch_buffer, &result_buffer, flags)?;
+        let instances_buffer = if self.bottom_level_as.is_some() {
+            None
+        } else {
+            Some(
+                BufferBuilder::new(self.context)
+                    .with_type(BufferType::RayTracingInstance)
+                    .with_size(instances_size)
+                    .build()?,
+            )
+        };
+
+        self.generate(
+            acc_structure,
+            &scratch_buffer,
+            &result_buffer,
+            instances_buffer.as_ref(),
+            flags,
+        )?;
 
         Ok(AccelerationStructure {
-            ray_tracing: Rc::clone(&self.pipeline_context.ray_tracing),
+            ray_tracing: self.ray_tracing,
             acc_structure,
             scratch_buffer,
             result_buffer,
+            instances_buffer,
         })
     }
 
@@ -139,8 +206,7 @@ impl<'a> AccelerationStructureBuilder<'a> {
             .acceleration_structure(acc_structure)
             .ty(ty)
             .build();
-        self.pipeline_context
-            .ray_tracing
+        self.ray_tracing
             .get_acceleration_structure_memory_requirements(&mem_requirements_info)
     }
 
@@ -149,34 +215,76 @@ impl<'a> AccelerationStructureBuilder<'a> {
         acc_structure: vk::AccelerationStructureNV,
         scratch_buffer: &Buffer,
         result_buffer: &Buffer,
+        instances_buffer: Option<&Buffer>,
         flags: vk::BuildAccelerationStructureFlagsNV,
     ) -> Result<(), VulkanError> {
+        if let Some(top_level_as) = self.top_level_as {
+            let mut geometry_instances = Vec::with_capacity(top_level_as.len());
+            for tlas in top_level_as.iter() {
+                let handle = self
+                    .ray_tracing
+                    .get_acceleration_structure_handle(tlas.bottom_level_as)?;
+
+                let mut g_inst = VulkanGeometryInstance {
+                    transform: [0.0; 12],
+                    instance_id: tlas.instance_id,
+                    mask: std::u8::MAX,
+                    instance_offset: tlas.hit_group_index,
+                    flags: vk::GeometryInstanceFlagsNV::TRIANGLE_CULL_DISABLE.as_raw(),
+                    acceleration_structure_handle: handle,
+                };
+
+                let src = glm::transpose(&tlas.transform).as_ptr() as *const f32;
+                unsafe {
+                    let dst = g_inst.transform.as_mut_ptr();
+                    ptr::copy(src, dst, mem::size_of::<[f32; 12]>());
+                }
+
+                geometry_instances.push(g_inst);
+            }
+
+            instances_buffer
+                .unwrap()
+                .copy_data(geometry_instances.as_ptr() as *const c_void)?;
+        }
+
         let bind_info = vk::BindAccelerationStructureMemoryInfoNV::builder()
             .acceleration_structure(acc_structure)
             .memory(result_buffer.get_memory())
             .memory_offset(0)
             .build();
 
-        self.pipeline_context
-            .ray_tracing
+        self.ray_tracing
             .bind_acceleration_structure_memory(&[bind_info])?;
 
-        let build_info = vk::AccelerationStructureInfoNV::builder()
-            .flags(flags)
-            .ty(vk::AccelerationStructureTypeNV::BOTTOM_LEVEL)
-            .geometries(self.bottom_level_as.as_slice())
-            .instance_count(0)
-            .build();
+        let build_info = if self.bottom_level_as.is_some() {
+            vk::AccelerationStructureInfoNV::builder()
+                .flags(flags)
+                .ty(vk::AccelerationStructureTypeNV::BOTTOM_LEVEL)
+                .geometries(self.bottom_level_as.unwrap().as_slice())
+                .instance_count(0)
+                .build()
+        } else {
+            vk::AccelerationStructureInfoNV::builder()
+                .flags(flags)
+                .ty(vk::AccelerationStructureTypeNV::TOP_LEVEL)
+                .instance_count(self.top_level_as.unwrap().len() as u32)
+                .build()
+        };
 
-        self.pipeline_context
-            .ray_tracing
-            .cmd_build_acceleration_structure(
-                self.command_buffer.unwrap(),
-                &build_info,
-                acc_structure,
-                scratch_buffer.get(),
-                0,
-            );
+        let instance_buffer = match instances_buffer {
+            Some(buffer) => buffer.get(),
+            None => vk::Buffer::null(),
+        };
+
+        self.ray_tracing.cmd_build_acceleration_structure(
+            self.command_buffer.unwrap(),
+            &build_info,
+            instance_buffer,
+            acc_structure,
+            scratch_buffer.get(),
+            0,
+        );
 
         let memory_barrier = vk::MemoryBarrier::builder()
             .src_access_mask(
@@ -189,7 +297,7 @@ impl<'a> AccelerationStructureBuilder<'a> {
             )
             .build();
 
-        self.pipeline_context.device.cmd_pipeline_barrier(
+        self.context.device.cmd_pipeline_barrier(
             self.command_buffer.unwrap(),
             vk::PipelineStageFlags::ACCELERATION_STRUCTURE_BUILD_NV,
             vk::PipelineStageFlags::ACCELERATION_STRUCTURE_BUILD_NV,
@@ -200,121 +308,5 @@ impl<'a> AccelerationStructureBuilder<'a> {
         );
 
         Ok(())
-    }
-}
-
-pub type BottomLevelAccelerationStructure = vk::GeometryNV;
-
-pub struct BottomLevelAccelerationStructureBuilder {
-    vertex_buffer: Option<vk::Buffer>,
-    vertex_offset: vk::DeviceSize,
-    vertex_count: u32,
-    vertex_size: vk::DeviceSize,
-    index_buffer: Option<vk::Buffer>,
-    index_offset: vk::DeviceSize,
-    index_count: u32,
-    transform_buffer: Option<vk::Buffer>,
-    transform_offset: vk::DeviceSize,
-    opaque: bool,
-}
-
-impl Default for BottomLevelAccelerationStructureBuilder {
-    fn default() -> Self {
-        BottomLevelAccelerationStructureBuilder {
-            vertex_buffer: None,
-            vertex_offset: 0,
-            vertex_count: 0,
-            vertex_size: 0,
-            index_buffer: None,
-            index_offset: 0,
-            index_count: 0,
-            transform_buffer: None,
-            transform_offset: 0,
-            opaque: false,
-        }
-    }
-}
-
-impl BottomLevelAccelerationStructureBuilder {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_vertex_buffer(mut self, buffer: vk::Buffer) -> Self {
-        self.vertex_buffer = Some(buffer);
-        self
-    }
-
-    pub fn with_vertex_offset(mut self, offset: u32) -> Self {
-        self.vertex_offset = offset as vk::DeviceSize;
-        self
-    }
-
-    pub fn with_vertex_count(mut self, count: u32) -> Self {
-        self.vertex_count = count;
-        self
-    }
-
-    pub fn with_vertex_size(mut self, size: u32) -> Self {
-        self.vertex_size = size as vk::DeviceSize;
-        self
-    }
-
-    pub fn with_index_buffer(mut self, buffer: vk::Buffer) -> Self {
-        self.index_buffer = Some(buffer);
-        self
-    }
-
-    pub fn with_index_offset(mut self, offset: u32) -> Self {
-        self.index_offset = offset as vk::DeviceSize;
-        self
-    }
-
-    pub fn with_index_count(mut self, count: u32) -> Self {
-        self.index_count = count;
-        self
-    }
-
-    pub fn with_transform_buffer(mut self, buffer: vk::Buffer) -> Self {
-        self.transform_buffer = Some(buffer);
-        self
-    }
-
-    pub fn with_transform_offset(mut self, offset: u32) -> Self {
-        self.transform_offset = offset as vk::DeviceSize;
-        self
-    }
-
-    pub fn build(self) -> BottomLevelAccelerationStructure {
-        let triangles = vk::GeometryTrianglesNV::builder()
-            .vertex_data(self.vertex_buffer.unwrap())
-            .vertex_offset(self.vertex_offset)
-            .vertex_count(self.vertex_count)
-            .vertex_stride(self.vertex_size)
-            .vertex_format(vk::Format::R32G32B32_SFLOAT)
-            .index_data(self.index_buffer.unwrap())
-            .index_offset(self.index_offset)
-            .index_count(self.index_count)
-            .index_type(vk::IndexType::UINT32)
-            .transform_data(self.transform_buffer.unwrap_or_else(vk::Buffer::null))
-            .transform_offset(self.transform_offset)
-            .build();
-
-        let flags = if self.opaque {
-            vk::GeometryFlagsNV::OPAQUE
-        } else {
-            vk::GeometryFlagsNV::empty()
-        };
-
-        vk::GeometryNV::builder()
-            .geometry_type(vk::GeometryTypeNV::TRIANGLES)
-            .geometry(
-                vk::GeometryDataNV::builder()
-                    .triangles(triangles)
-                    .aabbs(vk::GeometryAABBNV::default())
-                    .build(),
-            )
-            .flags(flags)
-            .build()
     }
 }

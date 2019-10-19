@@ -1,9 +1,7 @@
-use nalgebra_glm as glm;
-
-use vulkan_helpers::buffer::Buffer;
-use vulkan_helpers::vulkan_context::VulkanContext;
-
-use crate::model::Model;
+use crate::buffer::Buffer;
+use crate::glm;
+use crate::vertex::Vertex;
+use crate::vulkan_context::VulkanContext;
 
 pub struct GeometryInstance {
     pub vertex_buffer: Buffer,
@@ -17,35 +15,41 @@ pub struct GeometryInstance {
 
 pub struct GeometryInstanceBuilder<'a> {
     context: &'a VulkanContext,
-    model: Option<&'a Model>,
+    vertices: Vec<Vertex>,
+    indices: Vec<u32>,
 }
 
 impl<'a> GeometryInstanceBuilder<'a> {
     pub fn new(context: &'a VulkanContext) -> Self {
         GeometryInstanceBuilder {
             context,
-            model: None,
+            vertices: vec![],
+            indices: vec![],
         }
     }
 
-    pub fn with_model(mut self, model: &'a Model) -> Self {
-        self.model = Some(model);
+    pub fn with_vertices(mut self, vertices: &mut Vec<Vertex>) -> Self {
+        self.vertices.append(vertices);
+        self
+    }
+
+    pub fn with_indices(mut self, indices: &mut Vec<u32>) -> Self {
+        self.indices.append(indices);
         self
     }
 
     pub fn build(self) -> GeometryInstance {
         let transform = glm::identity();
-        let model = self.model.unwrap();
 
-        let vertex_buffer = self.context.create_vertex_buffer(&model.vertices).unwrap();
-        let index_buffer = self.context.create_index_buffer(&model.indices).unwrap();
+        let vertex_buffer = self.context.create_vertex_buffer(&self.vertices).unwrap();
+        let index_buffer = self.context.create_index_buffer(&self.indices).unwrap();
 
         GeometryInstance {
             vertex_buffer,
-            vertex_count: model.vertices.len(),
+            vertex_count: self.vertices.len(),
             vertex_offset: 0,
             index_buffer,
-            index_count: model.indices.len(),
+            index_count: self.indices.len(),
             index_offset: 0,
             transform,
         }

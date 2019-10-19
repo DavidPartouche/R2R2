@@ -1,9 +1,9 @@
 use ash::vk;
 
 use crate::command_buffers::CommandBuffers;
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
-use crate::instance::Instance;
+use crate::instance::VulkanInstance;
 use crate::physical_device::PhysicalDevice;
 
 pub struct Image {
@@ -14,8 +14,8 @@ pub struct Image {
 }
 
 pub(crate) fn create_image(
-    instance: &Instance,
-    device: &Device,
+    instance: &VulkanInstance,
+    device: &VulkanDevice,
     physical_device: PhysicalDevice,
     width: u32,
     height: u32,
@@ -68,7 +68,7 @@ pub(crate) fn create_image(
 }
 
 pub(crate) fn create_image_view(
-    device: &Device,
+    device: &VulkanDevice,
     image: vk::Image,
     format: vk::Format,
     aspect_flags: vk::ImageAspectFlags,
@@ -92,14 +92,14 @@ pub(crate) fn create_image_view(
 }
 
 pub(crate) fn transition_image_layout(
-    device: &Device,
+    device: &VulkanDevice,
     command_buffers: &CommandBuffers,
     image: vk::Image,
     format: vk::Format,
     old_layout: vk::ImageLayout,
     new_layout: vk::ImageLayout,
 ) -> Result<(), VulkanError> {
-    let command_buffer = command_buffers.begin_single_time_commands()?;
+    let command_buffer = command_buffers.begin_single_time_commands(0)?;
 
     let aspect_mask = if new_layout == vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL {
         if format == vk::Format::D32_SFLOAT_S8_UINT || format == vk::Format::D24_UNORM_S8_UINT {
@@ -176,5 +176,5 @@ pub(crate) fn transition_image_layout(
         &[barrier],
     );
 
-    command_buffers.end_single_time_commands(command_buffer)
+    command_buffers.end_single_time_commands(command_buffer, 0)
 }

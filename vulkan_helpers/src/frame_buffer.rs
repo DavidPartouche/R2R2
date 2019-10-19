@@ -3,13 +3,13 @@ use std::rc::Rc;
 use ash::vk;
 
 use crate::depth_resources::DepthResources;
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 use crate::image_views::ImageViews;
 use crate::render_pass::RenderPass;
 
 pub struct FrameBuffers {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     frame_buffers: Vec<vk::Framebuffer>,
 }
 
@@ -28,7 +28,7 @@ impl FrameBuffers {
 }
 
 pub struct FrameBuffersBuilder<'a> {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     render_pass: &'a RenderPass,
     image_views: &'a ImageViews,
     depth_resources: &'a DepthResources,
@@ -38,7 +38,7 @@ pub struct FrameBuffersBuilder<'a> {
 
 impl<'a> FrameBuffersBuilder<'a> {
     pub fn new(
-        device: Rc<Device>,
+        device: Rc<VulkanDevice>,
         render_pass: &'a RenderPass,
         image_views: &'a ImageViews,
         depth_resources: &'a DepthResources,

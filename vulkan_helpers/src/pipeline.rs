@@ -5,14 +5,14 @@ use std::rc::Rc;
 use ash::vk;
 
 use crate::descriptor_set_layout::DescriptorSetLayout;
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 use crate::shader_module::ShaderModuleBuilder;
 use crate::vertex::Vertex;
 use crate::vulkan_context::VulkanContext;
 
 pub struct Pipeline {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     pipeline_layout: vk::PipelineLayout,
     graphics_pipeline: vk::Pipeline,
 }

@@ -9,13 +9,13 @@ use crate::buffer::{Buffer, BufferBuilder, BufferType};
 use crate::command_buffers::{CommandBuffers, CommandBuffersBuilder};
 use crate::depth_resources::{DepthResources, DepthResourcesBuilder};
 use crate::descriptor_pool::{DescriptorPool, DescriptorPoolBuilder};
-use crate::device::{Device, DeviceBuilder};
+use crate::device::{VulkanDevice, VulkanDeviceBuilder};
 use crate::errors::VulkanError;
 use crate::extensions::DeviceExtensions;
 use crate::frame_buffer::{FrameBuffers, FrameBuffersBuilder};
 use crate::image_views::{ImageViews, ImageViewsBuilder};
 use crate::images::Image;
-use crate::instance::{Instance, InstanceBuilder};
+use crate::instance::{VulkanInstance, VulkanInstanceBuilder};
 use crate::material::Material;
 use crate::physical_device::{PhysicalDevice, PhysicalDeviceBuilder};
 use crate::present_mode::{PresentMode, PresentModeBuilder};
@@ -35,13 +35,13 @@ pub struct VulkanContext {
     swapchain: Swapchain,
     pub(crate) descriptor_pool: Rc<DescriptorPool>,
     pub(crate) command_buffers: CommandBuffers,
-    pub(crate) device: Rc<Device>,
+    pub(crate) device: Rc<VulkanDevice>,
     present_mode: PresentMode,
     surface_format: SurfaceFormat,
     queue_family: QueueFamily,
     pub(crate) physical_device: PhysicalDevice,
     surface: Surface,
-    pub(crate) instance: Rc<Instance>,
+    pub(crate) instance: Rc<VulkanInstance>,
     frame_index: usize,
     frames_count: usize,
     image_index: usize,
@@ -199,6 +199,19 @@ impl VulkanContext {
     pub fn get_current_command_buffer(&self) -> vk::CommandBuffer {
         self.command_buffers.get(self.frame_index)
     }
+
+    pub fn begin_single_time_commands(&self) -> Result<vk::CommandBuffer, VulkanError> {
+        self.command_buffers
+            .begin_single_time_commands(self.frame_index)
+    }
+
+    pub fn end_single_time_commands(
+        &self,
+        command_buffer: vk::CommandBuffer,
+    ) -> Result<(), VulkanError> {
+        self.command_buffers
+            .end_single_time_commands(command_buffer, self.frame_index)
+    }
 }
 
 pub struct VulkanContextBuilder {
@@ -324,19 +337,19 @@ impl VulkanContextBuilder {
         })
     }
 
-    fn create_instance(&self) -> Result<Instance, VulkanError> {
-        InstanceBuilder::new()
+    fn create_instance(&self) -> Result<VulkanInstance, VulkanError> {
+        VulkanInstanceBuilder::new()
             .with_debug_enabled(self.debug)
             .build()
     }
 
-    fn create_surface(&self, instance: &Instance) -> Result<Surface, VulkanError> {
+    fn create_surface(&self, instance: &VulkanInstance) -> Result<Surface, VulkanError> {
         SurfaceBuilder::new(instance).with_hwnd(self.hwnd).build()
     }
 
     fn get_physical_device(
         &self,
-        instance: &Instance,
+        instance: &VulkanInstance,
         surface: &Surface,
     ) -> Result<PhysicalDevice, VulkanError> {
         PhysicalDeviceBuilder::new(instance, surface)
@@ -346,7 +359,7 @@ impl VulkanContextBuilder {
 
     fn get_queue_family(
         &self,
-        instance: &Instance,
+        instance: &VulkanInstance,
         surface: &Surface,
         physical_device: PhysicalDevice,
     ) -> Result<QueueFamily, VulkanError> {
@@ -371,11 +384,11 @@ impl VulkanContextBuilder {
 
     fn create_logical_device(
         &self,
-        instance: Rc<Instance>,
+        instance: Rc<VulkanInstance>,
         physical_device: PhysicalDevice,
         queue_family: QueueFamily,
-    ) -> Result<Device, VulkanError> {
-        DeviceBuilder::new(instance, physical_device, queue_family)
+    ) -> Result<VulkanDevice, VulkanError> {
+        VulkanDeviceBuilder::new(instance, physical_device, queue_family)
             .with_extensions(&self.extensions)
             .build()
     }
@@ -383,20 +396,23 @@ impl VulkanContextBuilder {
     fn create_command_buffers(
         &self,
         queue_family: QueueFamily,
-        device: Rc<Device>,
+        device: Rc<VulkanDevice>,
     ) -> Result<CommandBuffers, VulkanError> {
         CommandBuffersBuilder::new(queue_family, device)
             .with_buffer_count(self.frames_count)
             .build()
     }
 
-    fn create_descriptor_pool(&self, device: Rc<Device>) -> Result<DescriptorPool, VulkanError> {
+    fn create_descriptor_pool(
+        &self,
+        device: Rc<VulkanDevice>,
+    ) -> Result<DescriptorPool, VulkanError> {
         DescriptorPoolBuilder::new(device).build()
     }
 
     fn create_swapchain(
         &self,
-        device: Rc<Device>,
+        device: Rc<VulkanDevice>,
         surface: &Surface,
         physical_device: PhysicalDevice,
         surface_format: SurfaceFormat,
@@ -416,9 +432,9 @@ impl VulkanContextBuilder {
 
     fn create_render_pass(
         &self,
-        instance: &Instance,
+        instance: &VulkanInstance,
         physical_device: PhysicalDevice,
-        device: Rc<Device>,
+        device: Rc<VulkanDevice>,
         surface_format: SurfaceFormat,
     ) -> Result<RenderPass, VulkanError> {
         RenderPassBuilder::new(instance, physical_device, device, surface_format).build()
@@ -426,7 +442,7 @@ impl VulkanContextBuilder {
 
     fn create_image_views(
         &self,
-        device: Rc<Device>,
+        device: Rc<VulkanDevice>,
         surface_format: SurfaceFormat,
         swapchain: &Swapchain,
     ) -> Result<ImageViews, VulkanError> {
@@ -435,9 +451,9 @@ impl VulkanContextBuilder {
 
     fn create_depth_resources(
         &self,
-        instance: &Instance,
+        instance: &VulkanInstance,
         physical_device: PhysicalDevice,
-        device: Rc<Device>,
+        device: Rc<VulkanDevice>,
         command_buffers: &CommandBuffers,
     ) -> Result<DepthResources, VulkanError> {
         DepthResourcesBuilder::new(instance, physical_device, device, command_buffers)
@@ -448,7 +464,7 @@ impl VulkanContextBuilder {
 
     fn create_frame_buffers(
         &self,
-        device: Rc<Device>,
+        device: Rc<VulkanDevice>,
         render_pass: &RenderPass,
         image_views: &ImageViews,
         depth_resources: &DepthResources,

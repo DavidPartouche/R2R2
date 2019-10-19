@@ -7,16 +7,14 @@ use ash::vk;
 use crate::buffer::{Buffer, BufferBuilder, BufferType};
 use crate::descriptor_set::{DescriptorSet, DescriptorSetBuilder};
 use crate::descriptor_set_layout::{DescriptorSetLayout, DescriptorSetLayoutBuilder};
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 use crate::pipeline::{Pipeline, PipelineBuilder};
-use crate::ray_tracing::{RayTracing, RayTracingBuilder};
 use crate::texture::Texture;
 use crate::vulkan_context::VulkanContext;
 
 pub struct GraphicsPipelineContext {
-    pub(crate) device: Rc<Device>,
-    pub(crate) ray_tracing: Rc<RayTracing>,
+    pub(crate) device: Rc<VulkanDevice>,
     uniform_buffer: Buffer,
     material_buffer: Buffer,
     textures: Vec<Texture>,
@@ -140,7 +138,6 @@ impl<'a> GraphicsPipelineContextBuilder<'a> {
             .build()
             .unwrap();
 
-        let ray_tracing = Rc::new(RayTracingBuilder::new(&self.context).build()?);
 
         Ok(GraphicsPipelineContext {
             device: Rc::clone(&self.context.device),
@@ -151,7 +148,6 @@ impl<'a> GraphicsPipelineContextBuilder<'a> {
             textures: self.textures,
             indices_count: self.indices_count as u32,
             descriptor_set,
-            ray_tracing,
         })
     }
 }

@@ -4,14 +4,14 @@ use std::rc::Rc;
 use ash::vk;
 
 use crate::buffer::{BufferBuilder, BufferType};
-use crate::device::Device;
+use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 use crate::images;
 use crate::images::Image;
 use crate::vulkan_context::VulkanContext;
 
 pub struct Texture {
-    device: Rc<Device>,
+    device: Rc<VulkanDevice>,
     texture_image: vk::Image,
     texture_image_memory: vk::DeviceMemory,
     texture_image_view: vk::ImageView,
@@ -147,7 +147,7 @@ impl<'a> TextureBuilder<'a> {
         width: u32,
         height: u32,
     ) -> Result<(), VulkanError> {
-        let command_buffer = self.context.command_buffers.begin_single_time_commands()?;
+        let command_buffer = self.context.command_buffers.begin_single_time_commands(0)?;
 
         let region = vk::BufferImageCopy::builder()
             .buffer_offset(0)
@@ -181,6 +181,6 @@ impl<'a> TextureBuilder<'a> {
 
         self.context
             .command_buffers
-            .end_single_time_commands(command_buffer)
+            .end_single_time_commands(command_buffer, 0)
     }
 }

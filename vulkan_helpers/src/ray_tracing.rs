@@ -27,6 +27,17 @@ impl RayTracing {
         }
     }
 
+    pub fn get_acceleration_structure_handle(
+        &self,
+        accel_struct: vk::AccelerationStructureNV,
+    ) -> Result<u64, VulkanError> {
+        unsafe {
+            self.ray_tracing
+                .get_acceleration_structure_handle(accel_struct)
+        }
+        .map_err(|err| VulkanError::RayTracingError(err.to_string()))
+    }
+
     pub fn get_acceleration_structure_memory_requirements(
         &self,
         info: &vk::AccelerationStructureMemoryRequirementsInfoNV,
@@ -49,6 +60,7 @@ impl RayTracing {
         &self,
         command_buffer: vk::CommandBuffer,
         info: &vk::AccelerationStructureInfoNV,
+        instance_buffer: vk::Buffer,
         acceleration_structure: vk::AccelerationStructureNV,
         scratch_buffer: vk::Buffer,
         scratch_offset: vk::DeviceSize,
@@ -57,7 +69,7 @@ impl RayTracing {
             self.ray_tracing.cmd_build_acceleration_structure(
                 command_buffer,
                 info,
-                vk::Buffer::null(),
+                instance_buffer,
                 0,
                 false,
                 acceleration_structure,

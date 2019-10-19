@@ -2,11 +2,13 @@ use std::mem::size_of;
 
 use ash::vk;
 
+use crate::glm;
+
 #[repr(C, packed)]
 pub struct Vertex {
-    pub pos: [f32; 3],
-    pub nrm: [f32; 3],
-    pub tex_coord: [f32; 2],
+    pub pos: glm::Vec3,
+    pub nrm: glm::Vec3,
+    pub tex_coord: glm::Vec2,
     pub mat_id: i32,
 }
 
