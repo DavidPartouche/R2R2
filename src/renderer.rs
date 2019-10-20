@@ -6,18 +6,9 @@ use vulkan_helpers::extensions::DeviceExtensions;
 use vulkan_helpers::glm;
 use vulkan_helpers::pipeline_context::{GraphicsPipelineContext, GraphicsPipelineContextBuilder};
 use vulkan_helpers::ray_tracing_pipeline::RayTracingPipelineBuilder;
-use vulkan_helpers::vertex::Vertex;
 use vulkan_helpers::vulkan_context::{VulkanContext, VulkanContextBuilder};
 
 use crate::model::Model;
-
-#[repr(C, packed)]
-struct UniformBufferObject {
-    model: glm::Mat4,
-    view: glm::Mat4,
-    proj: glm::Mat4,
-    model_it: glm::Mat4,
-}
 
 pub struct Renderer {
     context: VulkanContext,
@@ -56,12 +47,6 @@ impl Renderer {
     pub fn load_model(&mut self, filename: &Path) {
         //        let model = Model::new(filename);
 
-        //        let material_buffer = self
-        //            .context
-        //            .create_material_buffer(&model.materials)
-        //            .unwrap();
-        //        let textures = self.context.create_texture_images(&model.textures).unwrap();
-
         //        let graphics_pipeline = GraphicsPipelineContextBuilder::new(&self.context)
         //            .with_vertex_shader(Path::new("assets/shaders/vert_shader.spv"))
         //            .with_fragment_shader(Path::new("assets/shaders/frag_shader.spv"))
@@ -79,6 +64,8 @@ impl Renderer {
         let ray_tracing_pipeline = RayTracingPipelineBuilder::new(&self.context)
             .with_vertices(&mut model.vertices)
             .with_indices(&mut model.indices)
+            .with_materials(&mut model.materials)
+            .with_textures(&mut model.textures)
             .build();
     }
 
@@ -104,29 +91,29 @@ impl Renderer {
         //        self.context.frame_present().unwrap();
     }
 
-    fn update_uniform_buffer(&self) {
-        let aspect_ratio = self.width / self.height;
-        let model = glm::identity();
-        let model_it = glm::inverse_transpose(model);
-        let view = glm::look_at(
-            &glm::vec3(1.0, 1.0, 1.0),
-            &glm::vec3(0.0, 0.0, 0.0),
-            &glm::vec3(0.0, 1.0, 0.0),
-        );
-        let mut proj = glm::perspective(f32::to_radians(65.0), aspect_ratio, 0.1, 1000.0);
-        proj[(1, 1)] = -1.0;
-        let ubo = UniformBufferObject {
-            model,
-            view,
-            proj,
-            model_it,
-        };
-
-        let ubo = &ubo as *const UniformBufferObject as *const c_void;
-        self.graphics_pipeline
-            .as_ref()
-            .unwrap()
-            .update_uniform_buffer(ubo)
-            .unwrap();
-    }
+    //    fn update_uniform_buffer(&self) {
+    //        let aspect_ratio = self.width / self.height;
+    //        let model = glm::identity();
+    //        let model_it = glm::inverse_transpose(model);
+    //        let view = glm::look_at(
+    //            &glm::vec3(1.0, 1.0, 1.0),
+    //            &glm::vec3(0.0, 0.0, 0.0),
+    //            &glm::vec3(0.0, 1.0, 0.0),
+    //        );
+    //        let mut proj = glm::perspective(f32::to_radians(65.0), aspect_ratio, 0.1, 1000.0);
+    //        proj[(1, 1)] = -1.0;
+    //        let ubo = UniformBufferObject {
+    //            model,
+    //            view,
+    //            proj,
+    //            model_it,
+    //        };
+    //
+    //        let ubo = &ubo as *const UniformBufferObject as *const c_void;
+    //        self.graphics_pipeline
+    //            .as_ref()
+    //            .unwrap()
+    //            .update_uniform_buffer(ubo)
+    //            .unwrap();
+    //    }
 }

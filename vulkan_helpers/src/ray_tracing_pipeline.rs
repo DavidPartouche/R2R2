@@ -7,23 +7,33 @@ use crate::acceleration_structure::{
 use crate::bottom_level_acceleration_structure::{
     BottomLevelAccelerationStructure, BottomLevelAccelerationStructureBuilder,
 };
+use crate::buffer::{Buffer, BufferBuilder, BufferType};
 use crate::errors::VulkanError;
-use crate::geometry_instance::{GeometryInstance, GeometryInstanceBuilder};
+use crate::geometry_instance::{GeometryInstance, GeometryInstanceBuilder, UniformBufferObject};
+use crate::images::Image;
+use crate::material::Material;
 use crate::ray_tracing::{RayTracing, RayTracingBuilder};
+use crate::ray_tracing_descriptor_set::{RayTracingDescriptorSet, RayTracingDescriptorSetBuilder};
 use crate::vertex::Vertex;
 use crate::vulkan_context::VulkanContext;
 
 pub struct RayTracingPipeline {
+    descriptor_set: RayTracingDescriptorSet,
     top_level_as: AccelerationStructure,
     bottom_level_as: Vec<AccelerationStructure>,
-    geometry_instances: Vec<GeometryInstance>,
+    geometry_instance: GeometryInstance,
+    camera_buffer: Buffer,
     ray_tracing: Rc<RayTracing>,
 }
+
+impl RayTracingPipeline {}
 
 pub struct RayTracingPipelineBuilder<'a> {
     context: &'a VulkanContext,
     vertices: Vec<Vertex>,
     indices: Vec<u32>,
+    materials: Vec<Material>,
+    textures: Vec<Image>,
 }
 
 impl<'a> RayTracingPipelineBuilder<'a> {
@@ -32,6 +42,8 @@ impl<'a> RayTracingPipelineBuilder<'a> {
             context,
             vertices: vec![],
             indices: vec![],
+            materials: vec![],
+            textures: vec![],
         }
     }
 
@@ -45,51 +57,67 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         self
     }
 
+    pub fn with_materials(mut self, materials: &mut Vec<Material>) -> Self {
+        self.materials.append(materials);
+        self
+    }
+
+    pub fn with_textures(mut self, textures: &mut Vec<Image>) -> Self {
+        self.textures.append(textures);
+        self
+    }
+
     pub fn build(mut self) -> Result<RayTracingPipeline, VulkanError> {
         let ray_tracing = Rc::new(RayTracingBuilder::new(&self.context).build()?);
 
-        let geom = GeometryInstanceBuilder::new(&self.context)
+        let camera_buffer = BufferBuilder::new(&self.context)
+            .with_type(BufferType::Uniform)
+            .with_size(mem::size_of::<UniformBufferObject>() as u64)
+            .build()?;
+
+        let geometry_instance = GeometryInstanceBuilder::new(&self.context)
             .with_vertices(&mut self.vertices)
             .with_indices(&mut self.indices)
-            .build();
-        let geometry_instances = vec![geom];
+            .with_materials(&mut self.materials)
+            .with_textures(&mut self.textures)
+            .build()?;
 
         let (bottom_level_as, top_level_as) =
-            self.create_acceleration_structures(Rc::clone(&ray_tracing), &geometry_instances)?;
+            self.create_acceleration_structures(Rc::clone(&ray_tracing), &geometry_instance)?;
+
+        let descriptor_set =
+            self.create_descriptor_set(&camera_buffer, &geometry_instance, &top_level_as)?;
 
         Ok(RayTracingPipeline {
             ray_tracing,
-            geometry_instances,
+            camera_buffer,
+            geometry_instance,
             bottom_level_as,
             top_level_as,
+            descriptor_set,
         })
     }
 
     fn create_acceleration_structures(
         &self,
         ray_tracing: Rc<RayTracing>,
-        geometry_instances: &[GeometryInstance],
+        geometry_instance: &GeometryInstance,
     ) -> Result<(Vec<AccelerationStructure>, AccelerationStructure), VulkanError> {
         let command_buffer = self.context.begin_single_time_commands().unwrap();
-        let mut bottom_level_as = Vec::with_capacity(geometry_instances.len());
 
-        for geom in geometry_instances {
-            let blas = self.create_bottom_level_as(geom);
-            let structure =
-                AccelerationStructureBuilder::new(&self.context, Rc::clone(&ray_tracing))
-                    .with_bottom_level_as(&[blas])
-                    .with_command_buffer(command_buffer)
-                    .build()?;
-            bottom_level_as.push(structure);
-        }
+        let blas = self.create_bottom_level_as(geometry_instance);
+        let structure = AccelerationStructureBuilder::new(&self.context, Rc::clone(&ray_tracing))
+            .with_bottom_level_as(&[blas])
+            .with_command_buffer(command_buffer)
+            .build()?;
+        let bottom_level_as = vec![structure];
 
         let instances: Vec<Instance> = bottom_level_as
             .iter()
-            .zip(geometry_instances.iter())
             .enumerate()
-            .map(|(index, (blas, geom))| Instance {
+            .map(|(index, blas)| Instance {
                 bottom_level_as: blas.get(),
-                transform: geom.transform,
+                transform: geometry_instance.transform,
                 instance_id: index as u32,
                 hit_group_index: index as u32,
             })
@@ -116,5 +144,20 @@ impl<'a> RayTracingPipelineBuilder<'a> {
             .with_index_offset(geom.index_offset)
             .with_index_count(geom.index_count as u32)
             .build()
+    }
+
+    fn create_descriptor_set(
+        &self,
+        camera_buffer: &Buffer,
+        geometry_instance: &GeometryInstance,
+        top_level_as: &AccelerationStructure,
+    ) -> Result<RayTracingDescriptorSet, VulkanError> {
+        RayTracingDescriptorSetBuilder::new(
+            &self.context,
+            camera_buffer,
+            geometry_instance,
+            top_level_as,
+        )
+        .build()
     }
 }

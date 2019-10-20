@@ -82,7 +82,7 @@ impl<'a> BufferBuilder<'a> {
     pub fn build(self) -> Result<Buffer, VulkanError> {
         let usage = match &self.ty {
             BufferType::Index => {
-                vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST
+                vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::STORAGE_BUFFER
             }
             BufferType::RayTracing => vk::BufferUsageFlags::RAY_TRACING_NV,
             BufferType::RayTracingInstance => vk::BufferUsageFlags::RAY_TRACING_NV,
@@ -92,7 +92,7 @@ impl<'a> BufferBuilder<'a> {
             }
             BufferType::Uniform => vk::BufferUsageFlags::UNIFORM_BUFFER,
             BufferType::Vertex => {
-                vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST
+                vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::STORAGE_BUFFER
             }
         };
 
