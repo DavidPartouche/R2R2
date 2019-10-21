@@ -79,6 +79,17 @@ impl RayTracing {
             )
         }
     }
+
+    pub fn create_ray_tracing_pipelines(
+        &self,
+        info: &[vk::RayTracingPipelineCreateInfoNV],
+    ) -> Result<Vec<vk::Pipeline>, VulkanError> {
+        unsafe {
+            self.ray_tracing
+                .create_ray_tracing_pipelines(vk::PipelineCache::null(), info, None)
+        }
+        .map_err(|err| VulkanError::RayTracingError(err.to_string()))
+    }
 }
 
 pub struct RayTracingBuilder<'a> {

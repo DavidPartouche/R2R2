@@ -1,4 +1,5 @@
 use std::mem;
+use std::path::Path;
 use std::rc::Rc;
 
 use crate::acceleration_structure::{
@@ -12,12 +13,15 @@ use crate::errors::VulkanError;
 use crate::geometry_instance::{GeometryInstance, GeometryInstanceBuilder, UniformBufferObject};
 use crate::images::Image;
 use crate::material::Material;
+use crate::pipeline::{Pipeline, PipelineBuilder};
 use crate::ray_tracing::{RayTracing, RayTracingBuilder};
 use crate::ray_tracing_descriptor_set::{RayTracingDescriptorSet, RayTracingDescriptorSetBuilder};
+use crate::shader_module::ShaderModuleBuilder;
 use crate::vertex::Vertex;
 use crate::vulkan_context::VulkanContext;
 
 pub struct RayTracingPipeline {
+    pipeline: Pipeline,
     descriptor_set: RayTracingDescriptorSet,
     top_level_as: AccelerationStructure,
     bottom_level_as: Vec<AccelerationStructure>,
@@ -88,6 +92,8 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         let descriptor_set =
             self.create_descriptor_set(&camera_buffer, &geometry_instance, &top_level_as)?;
 
+        let pipeline = self.create_pipeline(&ray_tracing, &descriptor_set)?;
+
         Ok(RayTracingPipeline {
             ray_tracing,
             camera_buffer,
@@ -95,6 +101,7 @@ impl<'a> RayTracingPipelineBuilder<'a> {
             bottom_level_as,
             top_level_as,
             descriptor_set,
+            pipeline,
         })
     }
 
@@ -159,5 +166,28 @@ impl<'a> RayTracingPipelineBuilder<'a> {
             top_level_as,
         )
         .build()
+    }
+
+    fn create_pipeline(
+        &self,
+        ray_tracing: &RayTracing,
+        descriptor_set: &RayTracingDescriptorSet,
+    ) -> Result<Pipeline, VulkanError> {
+        let ray_gen_module = ShaderModuleBuilder::new(Rc::clone(&self.context.device))
+            .with_path(Path::new("assets/shaders/raygen.spv"))
+            .build()?;
+        let miss_module = ShaderModuleBuilder::new(Rc::clone(&self.context.device))
+            .with_path(Path::new("assets/shaders/miss.spv"))
+            .build()?;
+        let closest_hit_module = ShaderModuleBuilder::new(Rc::clone(&self.context.device))
+            .with_path(Path::new("assets/closesthit.spv"))
+            .build()?;
+
+        PipelineBuilder::new(&self.context, ray_tracing, descriptor_set)
+            .with_ray_gen_shader(ray_gen_module)
+            .with_miss_shader(miss_module)
+            .with_closest_hit_shader(closest_hit_module)
+            .with_max_recursion_depth(1)
+            .build()
     }
 }

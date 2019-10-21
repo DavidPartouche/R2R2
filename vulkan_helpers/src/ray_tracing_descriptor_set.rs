@@ -17,6 +17,10 @@ pub struct RayTracingDescriptorSet {
 }
 
 impl RayTracingDescriptorSet {
+    pub fn get_layout(&self) -> vk::DescriptorSetLayout {
+        self.descriptor_set_layout
+    }
+
     pub fn update_render_target(&self, target: vk::ImageView) {
         let output_image_info = vk::DescriptorImageInfo::builder()
             .image_layout(vk::ImageLayout::GENERAL)

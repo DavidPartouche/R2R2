@@ -1,157 +1,102 @@
 use std::ffi::CStr;
-use std::path::Path;
 use std::rc::Rc;
 
 use ash::vk;
 
-use crate::descriptor_set_layout::DescriptorSetLayout;
 use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
-use crate::shader_module::ShaderModuleBuilder;
-use crate::vertex::Vertex;
+use crate::ray_tracing::RayTracing;
+use crate::ray_tracing_descriptor_set::RayTracingDescriptorSet;
+use crate::shader_module::ShaderModule;
 use crate::vulkan_context::VulkanContext;
 
 pub struct Pipeline {
     device: Rc<VulkanDevice>,
     pipeline_layout: vk::PipelineLayout,
-    graphics_pipeline: vk::Pipeline,
+    pipeline: vk::Pipeline,
 }
 
 impl Drop for Pipeline {
     fn drop(&mut self) {
-        self.device.destroy_pipeline(self.graphics_pipeline);
+        self.device.destroy_pipeline(self.pipeline);
         self.device.destroy_pipeline_layout(self.pipeline_layout);
-    }
-}
-
-impl Pipeline {
-    pub fn get(&self) -> vk::Pipeline {
-        self.graphics_pipeline
-    }
-    pub fn get_layout(&self) -> vk::PipelineLayout {
-        self.pipeline_layout
     }
 }
 
 pub struct PipelineBuilder<'a> {
     context: &'a VulkanContext,
-    descriptor_set_layout: &'a DescriptorSetLayout,
-    vertex_shader: Option<&'a Path>,
-    fragment_shader: Option<&'a Path>,
+    ray_tracing: &'a RayTracing,
+    descriptor_set: &'a RayTracingDescriptorSet,
+    ray_gen_shader: Option<ShaderModule>,
+    miss_shader: Option<ShaderModule>,
+    closest_hit_shader: Option<ShaderModule>,
+    max_recursion_depth: u32,
 }
 
 impl<'a> PipelineBuilder<'a> {
-    pub fn new(context: &'a VulkanContext, descriptor_set_layout: &'a DescriptorSetLayout) -> Self {
+    pub fn new(
+        context: &'a VulkanContext,
+        ray_tracing: &'a RayTracing,
+        descriptor_set: &'a RayTracingDescriptorSet,
+    ) -> Self {
         PipelineBuilder {
             context,
-            descriptor_set_layout,
-            vertex_shader: None,
-            fragment_shader: None,
+            ray_tracing,
+            descriptor_set,
+            ray_gen_shader: None,
+            miss_shader: None,
+            closest_hit_shader: None,
+            max_recursion_depth: 0,
         }
     }
 
-    pub fn with_vertex_shader(mut self, vertex_shader: &'a Path) -> Self {
-        self.vertex_shader = Some(vertex_shader);
+    pub fn with_ray_gen_shader(mut self, ray_gen_shader: ShaderModule) -> Self {
+        self.ray_gen_shader = Some(ray_gen_shader);
         self
     }
 
-    pub fn with_fragment_shader(mut self, fragment_shader: &'a Path) -> Self {
-        self.fragment_shader = Some(fragment_shader);
+    pub fn with_miss_shader(mut self, miss_shader: ShaderModule) -> Self {
+        self.miss_shader = Some(miss_shader);
+        self
+    }
+
+    pub fn with_closest_hit_shader(mut self, closest_hit_shader: ShaderModule) -> Self {
+        self.closest_hit_shader = Some(closest_hit_shader);
+        self
+    }
+
+    pub fn with_max_recursion_depth(mut self, max_recursion_depth: u32) -> Self {
+        self.max_recursion_depth = max_recursion_depth;
         self
     }
 
     pub fn build(self) -> Result<Pipeline, VulkanError> {
-        let vert_shader_module = ShaderModuleBuilder::new(Rc::clone(&self.context.device))
-            .with_path(&self.vertex_shader.expect("Vertex shader not specified"))
-            .build()?;
-        let frag_shader_module = ShaderModuleBuilder::new(Rc::clone(&self.context.device))
-            .with_path(&self.fragment_shader.expect("Fragment shader not specified"))
-            .build()?;
+        let mut shader_stages = vec![];
+        let mut shader_groups = vec![];
 
-        let vert_stage_info = vk::PipelineShaderStageCreateInfo::builder()
-            .stage(vk::ShaderStageFlags::VERTEX)
-            .module(vert_shader_module.get())
-            .name(CStr::from_bytes_with_nul(b"main\0").unwrap())
-            .build();
-        let frag_stage_info = vk::PipelineShaderStageCreateInfo::builder()
-            .stage(vk::ShaderStageFlags::FRAGMENT)
-            .module(frag_shader_module.get())
-            .name(CStr::from_bytes_with_nul(b"main\0").unwrap())
-            .build();
+        let (shader_stage, shader_group) = self.add_shader_stage(
+            self.ray_gen_shader.as_ref().unwrap(),
+            vk::ShaderStageFlags::RAYGEN_NV,
+            0,
+        );
+        shader_stages.push(shader_stage);
+        shader_groups.push(shader_group);
 
-        let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder()
-            .vertex_binding_descriptions(&[Vertex::get_binding_description()])
-            .vertex_attribute_descriptions(&Vertex::get_attribute_descriptions())
-            .build();
+        let (shader_stage, shader_group) = self.add_shader_stage(
+            self.miss_shader.as_ref().unwrap(),
+            vk::ShaderStageFlags::MISS_NV,
+            1,
+        );
+        shader_stages.push(shader_stage);
+        shader_groups.push(shader_group);
 
-        let input_assembly = vk::PipelineInputAssemblyStateCreateInfo::builder()
-            .topology(vk::PrimitiveTopology::TRIANGLE_LIST)
-            .primitive_restart_enable(false)
-            .build();
-
-        let viewport = vk::Viewport::builder()
-            .x(0.0)
-            .y(0.0)
-            .width(self.context.width as f32)
-            .height(self.context.height as f32)
-            .min_depth(0.0)
-            .max_depth(1.0)
-            .build();
-
-        let scissor = vk::Rect2D::builder()
-            .offset(vk::Offset2D::builder().x(0).y(0).build())
-            .extent(
-                vk::Extent2D::builder()
-                    .width(self.context.width)
-                    .height(self.context.height)
-                    .build(),
-            )
-            .build();
-
-        let viewport_state = vk::PipelineViewportStateCreateInfo::builder()
-            .viewport_count(1)
-            .viewports(&[viewport])
-            .scissor_count(1)
-            .scissors(&[scissor])
-            .build();
-
-        let rasterizer = vk::PipelineRasterizationStateCreateInfo::builder()
-            .depth_clamp_enable(false)
-            .rasterizer_discard_enable(false)
-            .polygon_mode(vk::PolygonMode::FILL)
-            .line_width(1.0)
-            .cull_mode(vk::CullModeFlags::BACK)
-            .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-            .depth_bias_enable(false)
-            .build();
-
-        let multisampling = vk::PipelineMultisampleStateCreateInfo::builder()
-            .sample_shading_enable(false)
-            .rasterization_samples(vk::SampleCountFlags::TYPE_1)
-            .build();
-
-        let color_blend_attachment = vk::PipelineColorBlendAttachmentState::builder()
-            .color_write_mask(vk::ColorComponentFlags::all())
-            .blend_enable(false)
-            .build();
-
-        let color_blending = vk::PipelineColorBlendStateCreateInfo::builder()
-            .logic_op_enable(false)
-            .logic_op(vk::LogicOp::COPY)
-            .attachments(&[color_blend_attachment])
-            .blend_constants([0.0, 0.0, 0.0, 0.0])
-            .build();
-
-        let depth_stencil = vk::PipelineDepthStencilStateCreateInfo::builder()
-            .depth_test_enable(true)
-            .depth_write_enable(true)
-            .depth_compare_op(vk::CompareOp::LESS)
-            .depth_bounds_test_enable(false)
-            .stencil_test_enable(false)
-            .build();
+        let (shader_stage, shader_group) =
+            self.add_closest_hit_shader(self.closest_hit_shader.as_ref().unwrap(), 2);
+        shader_stages.push(shader_stage);
+        shader_groups.push(shader_group);
 
         let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
-            .set_layouts(&[self.descriptor_set_layout.get()])
+            .set_layouts(&[self.descriptor_set.get_layout()])
             .build();
 
         let pipeline_layout = self
@@ -159,29 +104,70 @@ impl<'a> PipelineBuilder<'a> {
             .device
             .create_pipeline_layout(&pipeline_layout_info)?;
 
-        let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
-            .stages(&[vert_stage_info, frag_stage_info])
-            .vertex_input_state(&vertex_input_info)
-            .input_assembly_state(&input_assembly)
-            .viewport_state(&viewport_state)
-            .rasterization_state(&rasterizer)
-            .multisample_state(&multisampling)
-            .color_blend_state(&color_blending)
-            .depth_stencil_state(&depth_stencil)
+        let pipeline_info = vk::RayTracingPipelineCreateInfoNV::builder()
+            .stages(&shader_stages)
+            .groups(&shader_groups)
+            .max_recursion_depth(self.max_recursion_depth)
             .layout(pipeline_layout)
-            .render_pass(self.context.render_pass.get())
-            .subpass(0)
             .build();
 
-        let graphics_pipeline = self
-            .context
-            .device
-            .create_graphics_pipelines(&[pipeline_info])?[0];
+        let pipeline = self
+            .ray_tracing
+            .create_ray_tracing_pipelines(&[pipeline_info])?[0];
 
         Ok(Pipeline {
             device: Rc::clone(&self.context.device),
             pipeline_layout,
-            graphics_pipeline,
+            pipeline,
         })
+    }
+
+    fn add_shader_stage(
+        &self,
+        shader: &ShaderModule,
+        stage: vk::ShaderStageFlags,
+        index: u32,
+    ) -> (
+        vk::PipelineShaderStageCreateInfo,
+        vk::RayTracingShaderGroupCreateInfoNV,
+    ) {
+        let stage_create = vk::PipelineShaderStageCreateInfo::builder()
+            .stage(stage)
+            .module(shader.get())
+            .name(CStr::from_bytes_with_nul(b"main\0").unwrap())
+            .build();
+        let group_info = vk::RayTracingShaderGroupCreateInfoNV::builder()
+            .ty(vk::RayTracingShaderGroupTypeNV::GENERAL)
+            .general_shader(index)
+            .closest_hit_shader(vk::SHADER_UNUSED_NV)
+            .any_hit_shader(vk::SHADER_UNUSED_NV)
+            .intersection_shader(vk::SHADER_UNUSED_NV)
+            .build();
+        (stage_create, group_info)
+    }
+
+    fn add_closest_hit_shader(
+        &self,
+        shader: &ShaderModule,
+        index: u32,
+    ) -> (
+        vk::PipelineShaderStageCreateInfo,
+        vk::RayTracingShaderGroupCreateInfoNV,
+    ) {
+        let stage_create = vk::PipelineShaderStageCreateInfo::builder()
+            .stage(vk::ShaderStageFlags::CLOSEST_HIT_NV)
+            .module(shader.get())
+            .name(CStr::from_bytes_with_nul(b"main\0").unwrap())
+            .build();
+
+        let group_info = vk::RayTracingShaderGroupCreateInfoNV::builder()
+            .ty(vk::RayTracingShaderGroupTypeNV::TRIANGLES_HIT_GROUP)
+            .general_shader(vk::SHADER_UNUSED_NV)
+            .closest_hit_shader(index)
+            .any_hit_shader(vk::SHADER_UNUSED_NV)
+            .intersection_shader(vk::SHADER_UNUSED_NV)
+            .build();
+
+        (stage_create, group_info)
     }
 }

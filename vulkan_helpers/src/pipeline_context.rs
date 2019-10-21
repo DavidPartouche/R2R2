@@ -19,7 +19,7 @@ pub struct GraphicsPipelineContext {
     material_buffer: Buffer,
     textures: Vec<Texture>,
     descriptor_set: DescriptorSet,
-    graphics_pipeline: Pipeline,
+    //    graphics_pipeline: Pipeline,
     descriptor_set_layout: DescriptorSetLayout,
     indices_count: u32,
 }
@@ -41,21 +41,21 @@ impl GraphicsPipelineContext {
         vertex_buffer: vk::Buffer,
         index_buffer: vk::Buffer,
     ) {
-        self.device
-            .cmd_bind_pipeline(command_buffer, self.graphics_pipeline.get());
-        self.device.cmd_bind_descriptor_sets(
-            command_buffer,
-            self.graphics_pipeline.get_layout(),
-            &[self.descriptor_set.get()],
-        );
-        self.device
-            .cmd_bind_vertex_buffers(command_buffer, &[vertex_buffer]);
-        self.device
-            .cmd_bind_index_buffer(command_buffer, index_buffer);
-        self.device
-            .cmd_draw_indexed(command_buffer, self.indices_count);
-
-        self.device.cmd_next_subpass(command_buffer);
+        //        self.device
+        //            .cmd_bind_pipeline(command_buffer, self.graphics_pipeline.get());
+        //        self.device.cmd_bind_descriptor_sets(
+        //            command_buffer,
+        //            self.graphics_pipeline.get_layout(),
+        //            &[self.descriptor_set.get()],
+        //        );
+        //        self.device
+        //            .cmd_bind_vertex_buffers(command_buffer, &[vertex_buffer]);
+        //        self.device
+        //            .cmd_bind_index_buffer(command_buffer, index_buffer);
+        //        self.device
+        //            .cmd_draw_indexed(command_buffer, self.indices_count);
+        //
+        //        self.device.cmd_next_subpass(command_buffer);
     }
 }
 
@@ -117,10 +117,10 @@ impl<'a> GraphicsPipelineContextBuilder<'a> {
             .with_texture_count(self.textures.len() as u32)
             .build()?;
 
-        let graphics_pipeline = PipelineBuilder::new(&self.context, &descriptor_set_layout)
-            .with_vertex_shader(self.vertex_shader.unwrap())
-            .with_fragment_shader(self.fragment_shader.unwrap())
-            .build()?;
+        //        let graphics_pipeline = PipelineBuilder::new(&self.context, &descriptor_set_layout)
+        //            .with_vertex_shader(self.vertex_shader.unwrap())
+        //            .with_fragment_shader(self.fragment_shader.unwrap())
+        //            .build()?;
 
         let uniform_buffer = BufferBuilder::new(&self.context)
             .with_type(BufferType::Uniform)
@@ -138,11 +138,10 @@ impl<'a> GraphicsPipelineContextBuilder<'a> {
             .build()
             .unwrap();
 
-
         Ok(GraphicsPipelineContext {
             device: Rc::clone(&self.context.device),
             descriptor_set_layout,
-            graphics_pipeline,
+            //            graphics_pipeline,
             uniform_buffer,
             material_buffer,
             textures: self.textures,
