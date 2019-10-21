@@ -3,10 +3,10 @@ use std::rc::Rc;
 
 use ash::vk;
 
+use crate::descriptor_set::DescriptorSet;
 use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 use crate::ray_tracing::RayTracing;
-use crate::ray_tracing_descriptor_set::RayTracingDescriptorSet;
 use crate::shader_module::ShaderModule;
 use crate::vulkan_context::VulkanContext;
 
@@ -26,7 +26,7 @@ impl Drop for Pipeline {
 pub struct PipelineBuilder<'a> {
     context: &'a VulkanContext,
     ray_tracing: &'a RayTracing,
-    descriptor_set: &'a RayTracingDescriptorSet,
+    descriptor_set: &'a DescriptorSet,
     ray_gen_shader: Option<ShaderModule>,
     miss_shader: Option<ShaderModule>,
     closest_hit_shader: Option<ShaderModule>,
@@ -37,7 +37,7 @@ impl<'a> PipelineBuilder<'a> {
     pub fn new(
         context: &'a VulkanContext,
         ray_tracing: &'a RayTracing,
-        descriptor_set: &'a RayTracingDescriptorSet,
+        descriptor_set: &'a DescriptorSet,
     ) -> Self {
         PipelineBuilder {
             context,

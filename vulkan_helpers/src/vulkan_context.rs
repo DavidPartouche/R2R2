@@ -8,11 +8,11 @@ use ash::vk;
 use crate::buffer::{Buffer, BufferBuilder, BufferType};
 use crate::command_buffers::{CommandBuffers, CommandBuffersBuilder};
 use crate::depth_resources::{DepthResources, DepthResourcesBuilder};
-use crate::descriptor_pool::{DescriptorPool, DescriptorPoolBuilder};
 use crate::device::{VulkanDevice, VulkanDeviceBuilder};
 use crate::errors::VulkanError;
 use crate::extensions::DeviceExtensions;
 use crate::frame_buffer::{FrameBuffers, FrameBuffersBuilder};
+use crate::geometry_instance::Vertex;
 use crate::image_views::{ImageViews, ImageViewsBuilder};
 use crate::images::Image;
 use crate::instance::{VulkanInstance, VulkanInstanceBuilder};
@@ -25,22 +25,17 @@ use crate::surface::{Surface, SurfaceBuilder};
 use crate::surface_format::{SurfaceFormat, SurfaceFormatBuilder};
 use crate::swapchain::{Swapchain, SwapchainBuilder};
 use crate::texture::{Texture, TextureBuilder};
-use crate::vertex::Vertex;
 
 pub struct VulkanContext {
     frame_buffers: FrameBuffers,
-    depth_resources: DepthResources,
-    image_views: ImageViews,
+    _depth_resources: DepthResources,
+    _image_views: ImageViews,
     pub(crate) render_pass: RenderPass,
     swapchain: Swapchain,
-    pub(crate) descriptor_pool: Rc<DescriptorPool>,
     pub(crate) command_buffers: CommandBuffers,
     pub(crate) device: Rc<VulkanDevice>,
-    present_mode: PresentMode,
-    surface_format: SurfaceFormat,
-    queue_family: QueueFamily,
     pub(crate) physical_device: PhysicalDevice,
-    surface: Surface,
+    _surface: Surface,
     pub(crate) instance: Rc<VulkanInstance>,
     frame_index: usize,
     frames_count: usize,
@@ -86,7 +81,7 @@ impl VulkanContext {
         Ok(mat_buffer)
     }
 
-    pub fn create_texture_images(&self, images: &Vec<Image>) -> Result<Vec<Texture>, VulkanError> {
+    pub fn create_texture_images(&self, images: &[Image]) -> Result<Vec<Texture>, VulkanError> {
         let mut textures = vec![];
 
         if images.is_empty() {
@@ -284,7 +279,6 @@ impl VulkanContextBuilder {
             queue_family,
         )?);
         let command_buffers = self.create_command_buffers(queue_family, Rc::clone(&device))?;
-        let descriptor_pool = Rc::new(self.create_descriptor_pool(Rc::clone(&device))?);
         let swapchain = self.create_swapchain(
             Rc::clone(&device),
             &surface,
@@ -315,18 +309,14 @@ impl VulkanContextBuilder {
 
         Ok(VulkanContext {
             instance,
-            surface,
+            _surface: surface,
             physical_device,
-            queue_family,
-            surface_format,
-            present_mode,
             device,
             command_buffers,
-            descriptor_pool,
             swapchain,
             render_pass,
-            image_views,
-            depth_resources,
+            _image_views: image_views,
+            _depth_resources: depth_resources,
             frame_buffers,
             frame_index: 0,
             frames_count: self.frames_count,
@@ -401,13 +391,6 @@ impl VulkanContextBuilder {
         CommandBuffersBuilder::new(queue_family, device)
             .with_buffer_count(self.frames_count)
             .build()
-    }
-
-    fn create_descriptor_pool(
-        &self,
-        device: Rc<VulkanDevice>,
-    ) -> Result<DescriptorPool, VulkanError> {
-        DescriptorPoolBuilder::new(device).build()
     }
 
     fn create_swapchain(

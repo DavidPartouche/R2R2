@@ -1,9 +1,8 @@
 use std::path::Path;
 
-use vulkan_helpers::glm;
 use vulkan_helpers::images::Image;
 use vulkan_helpers::material::Material;
-use vulkan_helpers::vertex::Vertex;
+use vulkan_helpers::{glm, Vertex};
 
 pub struct Model {
     pub vertices: Vec<Vertex>,

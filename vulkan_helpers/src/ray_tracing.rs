@@ -5,7 +5,7 @@ use crate::vulkan_context::VulkanContext;
 
 pub struct RayTracing {
     ray_tracing: ash::extensions::nv::RayTracing,
-    ray_tracing_properties: vk::PhysicalDeviceRayTracingPropertiesNV,
+    _ray_tracing_properties: vk::PhysicalDeviceRayTracingPropertiesNV,
 }
 
 impl RayTracing {
@@ -122,7 +122,7 @@ impl<'a> RayTracingBuilder<'a> {
 
         Ok(RayTracing {
             ray_tracing,
-            ray_tracing_properties,
+            _ray_tracing_properties: ray_tracing_properties,
         })
     }
 }

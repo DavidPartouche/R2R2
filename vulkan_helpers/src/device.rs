@@ -238,17 +238,6 @@ impl VulkanDevice {
         }
     }
 
-    pub fn create_graphics_pipelines(
-        &self,
-        pipeline_info: &[vk::GraphicsPipelineCreateInfo],
-    ) -> Result<Vec<vk::Pipeline>, VulkanError> {
-        unsafe {
-            self.device
-                .create_graphics_pipelines(vk::PipelineCache::null(), pipeline_info, None)
-        }
-        .map_err(|(_, err)| VulkanError::DeviceError(err.to_string()))
-    }
-
     pub fn destroy_pipeline(&self, pipeline: vk::Pipeline) {
         unsafe {
             self.device.destroy_pipeline(pipeline, None);

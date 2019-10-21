@@ -10,8 +10,6 @@ pub struct BottomLevelAccelerationStructureBuilder {
     index_buffer: Option<vk::Buffer>,
     index_offset: vk::DeviceSize,
     index_count: u32,
-    transform_buffer: Option<vk::Buffer>,
-    transform_offset: vk::DeviceSize,
     opaque: bool,
 }
 
@@ -25,8 +23,6 @@ impl Default for BottomLevelAccelerationStructureBuilder {
             index_buffer: None,
             index_offset: 0,
             index_count: 0,
-            transform_buffer: None,
-            transform_offset: 0,
             opaque: false,
         }
     }
@@ -72,16 +68,6 @@ impl BottomLevelAccelerationStructureBuilder {
         self
     }
 
-    pub fn with_transform_buffer(mut self, buffer: vk::Buffer) -> Self {
-        self.transform_buffer = Some(buffer);
-        self
-    }
-
-    pub fn with_transform_offset(mut self, offset: u32) -> Self {
-        self.transform_offset = offset as vk::DeviceSize;
-        self
-    }
-
     pub fn build(self) -> BottomLevelAccelerationStructure {
         let triangles = vk::GeometryTrianglesNV::builder()
             .vertex_data(self.vertex_buffer.unwrap())
@@ -93,8 +79,8 @@ impl BottomLevelAccelerationStructureBuilder {
             .index_offset(self.index_offset)
             .index_count(self.index_count)
             .index_type(vk::IndexType::UINT32)
-            .transform_data(self.transform_buffer.unwrap_or_else(vk::Buffer::null))
-            .transform_offset(self.transform_offset)
+            .transform_data(vk::Buffer::null())
+            .transform_offset(0)
             .build();
 
         let flags = if self.opaque {

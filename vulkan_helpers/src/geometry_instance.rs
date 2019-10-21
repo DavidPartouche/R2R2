@@ -4,8 +4,15 @@ use crate::glm;
 use crate::images::Image;
 use crate::material::Material;
 use crate::texture::Texture;
-use crate::vertex::Vertex;
 use crate::vulkan_context::VulkanContext;
+
+#[repr(C, packed)]
+pub struct Vertex {
+    pub pos: glm::Vec3,
+    pub nrm: glm::Vec3,
+    pub tex_coord: glm::Vec2,
+    pub mat_id: i32,
+}
 
 #[repr(C, packed)]
 pub struct UniformBufferObject {

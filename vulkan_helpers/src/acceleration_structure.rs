@@ -31,9 +31,9 @@ struct VulkanGeometryInstance {
 
 pub struct AccelerationStructure {
     ray_tracing: Rc<RayTracing>,
-    scratch_buffer: Buffer,
-    result_buffer: Buffer,
-    instances_buffer: Option<Buffer>,
+    _scratch_buffer: Buffer,
+    _result_buffer: Buffer,
+    _instances_buffer: Option<Buffer>,
     acc_structure: vk::AccelerationStructureNV,
 }
 
@@ -56,7 +56,6 @@ pub struct AccelerationStructureBuilder<'a> {
     command_buffer: Option<vk::CommandBuffer>,
     bottom_level_as: Option<&'a [BottomLevelAccelerationStructure]>,
     top_level_as: Option<&'a [Instance]>,
-    allow_update: bool,
 }
 
 impl<'a> AccelerationStructureBuilder<'a> {
@@ -67,7 +66,6 @@ impl<'a> AccelerationStructureBuilder<'a> {
             command_buffer: None,
             bottom_level_as: None,
             top_level_as: None,
-            allow_update: false,
         }
     }
 
@@ -84,34 +82,23 @@ impl<'a> AccelerationStructureBuilder<'a> {
         self
     }
 
-    pub fn with_allow_update(mut self, allow_update: bool) -> Self {
-        self.allow_update = allow_update;
-        self
-    }
-
     pub fn with_command_buffer(mut self, command_buffer: vk::CommandBuffer) -> Self {
         self.command_buffer = Some(command_buffer);
         self
     }
 
     pub fn build(self) -> Result<AccelerationStructure, VulkanError> {
-        let flags = if self.allow_update {
-            vk::BuildAccelerationStructureFlagsNV::ALLOW_UPDATE
-        } else {
-            vk::BuildAccelerationStructureFlagsNV::empty()
-        };
-
         let as_info = if self.bottom_level_as.is_some() {
             vk::AccelerationStructureInfoNV::builder()
                 .ty(vk::AccelerationStructureTypeNV::BOTTOM_LEVEL)
-                .flags(flags)
+                .flags(vk::BuildAccelerationStructureFlagsNV::empty())
                 .instance_count(0)
                 .geometries(self.bottom_level_as.unwrap())
                 .build()
         } else {
             vk::AccelerationStructureInfoNV::builder()
                 .ty(vk::AccelerationStructureTypeNV::TOP_LEVEL)
-                .flags(flags)
+                .flags(vk::BuildAccelerationStructureFlagsNV::empty())
                 .instance_count(self.top_level_as.unwrap().len() as u32)
                 .geometries(&[])
                 .build()
@@ -161,15 +148,14 @@ impl<'a> AccelerationStructureBuilder<'a> {
             &scratch_buffer,
             &result_buffer,
             instances_buffer.as_ref(),
-            flags,
         )?;
 
         Ok(AccelerationStructure {
             ray_tracing: self.ray_tracing,
             acc_structure,
-            scratch_buffer,
-            result_buffer,
-            instances_buffer,
+            _scratch_buffer: scratch_buffer,
+            _result_buffer: result_buffer,
+            _instances_buffer: instances_buffer,
         })
     }
 
@@ -217,7 +203,6 @@ impl<'a> AccelerationStructureBuilder<'a> {
         scratch_buffer: &Buffer,
         result_buffer: &Buffer,
         instances_buffer: Option<&Buffer>,
-        flags: vk::BuildAccelerationStructureFlagsNV,
     ) -> Result<(), VulkanError> {
         if let Some(top_level_as) = self.top_level_as {
             let mut geometry_instances = Vec::with_capacity(top_level_as.len());
@@ -260,14 +245,14 @@ impl<'a> AccelerationStructureBuilder<'a> {
 
         let build_info = if self.bottom_level_as.is_some() {
             vk::AccelerationStructureInfoNV::builder()
-                .flags(flags)
+                .flags(vk::BuildAccelerationStructureFlagsNV::empty())
                 .ty(vk::AccelerationStructureTypeNV::BOTTOM_LEVEL)
                 .geometries(self.bottom_level_as.unwrap())
                 .instance_count(0)
                 .build()
         } else {
             vk::AccelerationStructureInfoNV::builder()
-                .flags(flags)
+                .flags(vk::BuildAccelerationStructureFlagsNV::empty())
                 .ty(vk::AccelerationStructureTypeNV::TOP_LEVEL)
                 .instance_count(self.top_level_as.unwrap().len() as u32)
                 .build()

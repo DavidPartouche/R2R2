@@ -1,21 +1,19 @@
 pub use nalgebra_glm as glm;
 
-pub mod buffer;
+pub use geometry_instance::Vertex;
+
 pub mod extensions;
 pub mod images;
 pub mod material;
-pub mod pipeline_context;
 pub mod ray_tracing_pipeline;
-pub mod vertex;
 pub mod vulkan_context;
 
 mod acceleration_structure;
 mod bottom_level_acceleration_structure;
+mod buffer;
 mod command_buffers;
 mod depth_resources;
-mod descriptor_pool;
 mod descriptor_set;
-mod descriptor_set_layout;
 mod device;
 mod errors;
 mod frame_buffer;
@@ -27,7 +25,6 @@ mod pipeline;
 mod present_mode;
 mod queue_family;
 mod ray_tracing;
-mod ray_tracing_descriptor_set;
 mod render_pass;
 mod shader_module;
 mod surface;

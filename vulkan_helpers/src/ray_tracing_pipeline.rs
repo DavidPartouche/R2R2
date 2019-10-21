@@ -2,6 +2,8 @@ use std::mem;
 use std::path::Path;
 use std::rc::Rc;
 
+use ash::vk;
+
 use crate::acceleration_structure::{
     AccelerationStructure, AccelerationStructureBuilder, Instance,
 };
@@ -9,28 +11,34 @@ use crate::bottom_level_acceleration_structure::{
     BottomLevelAccelerationStructure, BottomLevelAccelerationStructureBuilder,
 };
 use crate::buffer::{Buffer, BufferBuilder, BufferType};
+use crate::descriptor_set::{DescriptorSet, DescriptorSetBuilder};
 use crate::errors::VulkanError;
-use crate::geometry_instance::{GeometryInstance, GeometryInstanceBuilder, UniformBufferObject};
+use crate::geometry_instance::{
+    GeometryInstance, GeometryInstanceBuilder, UniformBufferObject, Vertex,
+};
 use crate::images::Image;
 use crate::material::Material;
 use crate::pipeline::{Pipeline, PipelineBuilder};
 use crate::ray_tracing::{RayTracing, RayTracingBuilder};
-use crate::ray_tracing_descriptor_set::{RayTracingDescriptorSet, RayTracingDescriptorSetBuilder};
 use crate::shader_module::ShaderModuleBuilder;
-use crate::vertex::Vertex;
 use crate::vulkan_context::VulkanContext;
 
 pub struct RayTracingPipeline {
-    pipeline: Pipeline,
-    descriptor_set: RayTracingDescriptorSet,
-    top_level_as: AccelerationStructure,
-    bottom_level_as: Vec<AccelerationStructure>,
-    geometry_instance: GeometryInstance,
-    camera_buffer: Buffer,
-    ray_tracing: Rc<RayTracing>,
+    _pipeline: Pipeline,
+    descriptor_set: DescriptorSet,
+    _top_level_as: AccelerationStructure,
+    _bottom_level_as: Vec<AccelerationStructure>,
+    _geometry_instance: GeometryInstance,
+    _camera_buffer: Buffer,
+    _ray_tracing: Rc<RayTracing>,
 }
 
-impl RayTracingPipeline {}
+impl RayTracingPipeline {
+    pub fn draw(&self) {
+        self.descriptor_set
+            .update_render_target(vk::ImageView::null());
+    }
+}
 
 pub struct RayTracingPipelineBuilder<'a> {
     context: &'a VulkanContext,
@@ -95,13 +103,13 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         let pipeline = self.create_pipeline(&ray_tracing, &descriptor_set)?;
 
         Ok(RayTracingPipeline {
-            ray_tracing,
-            camera_buffer,
-            geometry_instance,
-            bottom_level_as,
-            top_level_as,
+            _ray_tracing: ray_tracing,
+            _camera_buffer: camera_buffer,
+            _geometry_instance: geometry_instance,
+            _bottom_level_as: bottom_level_as,
+            _top_level_as: top_level_as,
             descriptor_set,
-            pipeline,
+            _pipeline: pipeline,
         })
     }
 
@@ -158,8 +166,8 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         camera_buffer: &Buffer,
         geometry_instance: &GeometryInstance,
         top_level_as: &AccelerationStructure,
-    ) -> Result<RayTracingDescriptorSet, VulkanError> {
-        RayTracingDescriptorSetBuilder::new(
+    ) -> Result<DescriptorSet, VulkanError> {
+        DescriptorSetBuilder::new(
             &self.context,
             camera_buffer,
             geometry_instance,
@@ -171,7 +179,7 @@ impl<'a> RayTracingPipelineBuilder<'a> {
     fn create_pipeline(
         &self,
         ray_tracing: &RayTracing,
-        descriptor_set: &RayTracingDescriptorSet,
+        descriptor_set: &DescriptorSet,
     ) -> Result<Pipeline, VulkanError> {
         let ray_gen_module = ShaderModuleBuilder::new(Rc::clone(&self.context.device))
             .with_path(Path::new("assets/shaders/raygen.spv"))
@@ -180,7 +188,7 @@ impl<'a> RayTracingPipelineBuilder<'a> {
             .with_path(Path::new("assets/shaders/miss.spv"))
             .build()?;
         let closest_hit_module = ShaderModuleBuilder::new(Rc::clone(&self.context.device))
-            .with_path(Path::new("assets/closesthit.spv"))
+            .with_path(Path::new("assets/shaders/closesthit.spv"))
             .build()?;
 
         PipelineBuilder::new(&self.context, ray_tracing, descriptor_set)
