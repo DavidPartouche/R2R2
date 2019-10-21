@@ -12,6 +12,7 @@ pub enum BufferType {
     Index,
     RayTracing,
     RayTracingInstance,
+    ShaderBindingTable,
     Staging,
     Storage,
     Uniform,
@@ -82,17 +83,22 @@ impl<'a> BufferBuilder<'a> {
     pub fn build(self) -> Result<Buffer, VulkanError> {
         let usage = match &self.ty {
             BufferType::Index => {
-                vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::STORAGE_BUFFER
+                vk::BufferUsageFlags::INDEX_BUFFER
+                    | vk::BufferUsageFlags::TRANSFER_DST
+                    | vk::BufferUsageFlags::STORAGE_BUFFER
             }
             BufferType::RayTracing => vk::BufferUsageFlags::RAY_TRACING_NV,
             BufferType::RayTracingInstance => vk::BufferUsageFlags::RAY_TRACING_NV,
+            BufferType::ShaderBindingTable => vk::BufferUsageFlags::TRANSFER_SRC,
             BufferType::Staging => vk::BufferUsageFlags::TRANSFER_SRC,
             BufferType::Storage => {
                 vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::TRANSFER_DST
             }
             BufferType::Uniform => vk::BufferUsageFlags::UNIFORM_BUFFER,
             BufferType::Vertex => {
-                vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::STORAGE_BUFFER
+                vk::BufferUsageFlags::VERTEX_BUFFER
+                    | vk::BufferUsageFlags::TRANSFER_DST
+                    | vk::BufferUsageFlags::STORAGE_BUFFER
             }
         };
 
@@ -102,6 +108,7 @@ impl<'a> BufferBuilder<'a> {
             BufferType::RayTracingInstance => {
                 vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT
             }
+            BufferType::ShaderBindingTable => vk::MemoryPropertyFlags::HOST_VISIBLE,
             BufferType::Staging => {
                 vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT
             }

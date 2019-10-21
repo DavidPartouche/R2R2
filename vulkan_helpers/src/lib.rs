@@ -26,6 +26,7 @@ mod present_mode;
 mod queue_family;
 mod ray_tracing;
 mod render_pass;
+mod shader_binding_table;
 mod shader_module;
 mod surface;
 mod surface_format;

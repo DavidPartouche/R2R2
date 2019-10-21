@@ -5,10 +5,14 @@ use crate::vulkan_context::VulkanContext;
 
 pub struct RayTracing {
     ray_tracing: ash::extensions::nv::RayTracing,
-    _ray_tracing_properties: vk::PhysicalDeviceRayTracingPropertiesNV,
+    ray_tracing_properties: vk::PhysicalDeviceRayTracingPropertiesNV,
 }
 
 impl RayTracing {
+    pub fn get_properties(&self) -> vk::PhysicalDeviceRayTracingPropertiesNV {
+        self.ray_tracing_properties
+    }
+
     pub fn create_acceleration_structure(
         &self,
         info: &vk::AccelerationStructureCreateInfoNV,
@@ -90,6 +94,24 @@ impl RayTracing {
         }
         .map_err(|err| VulkanError::RayTracingError(err.to_string()))
     }
+
+    pub fn get_ray_tracing_shader_group_handles(
+        &self,
+        pipeline: vk::Pipeline,
+        first_group: u32,
+        group_count: u32,
+        data: &mut [u8],
+    ) -> Result<(), VulkanError> {
+        unsafe {
+            self.ray_tracing.get_ray_tracing_shader_group_handles(
+                pipeline,
+                first_group,
+                group_count,
+                data,
+            )
+        }
+        .map_err(|err| VulkanError::RayTracingError(err.to_string()))
+    }
 }
 
 pub struct RayTracingBuilder<'a> {
@@ -122,7 +144,7 @@ impl<'a> RayTracingBuilder<'a> {
 
         Ok(RayTracing {
             ray_tracing,
-            _ray_tracing_properties: ray_tracing_properties,
+            ray_tracing_properties,
         })
     }
 }

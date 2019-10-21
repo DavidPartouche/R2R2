@@ -14,6 +14,15 @@ pub struct Pipeline {
     device: Rc<VulkanDevice>,
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
+    pub ray_gen_index: u32,
+    pub miss_index: u32,
+    pub hit_group_index: u32,
+}
+
+impl Pipeline {
+    pub fn get(&self) -> vk::Pipeline {
+        self.pipeline
+    }
 }
 
 impl Drop for Pipeline {
@@ -74,24 +83,27 @@ impl<'a> PipelineBuilder<'a> {
         let mut shader_stages = vec![];
         let mut shader_groups = vec![];
 
+        let ray_gen_index = 0;
         let (shader_stage, shader_group) = self.add_shader_stage(
             self.ray_gen_shader.as_ref().unwrap(),
             vk::ShaderStageFlags::RAYGEN_NV,
-            0,
+            ray_gen_index,
         );
         shader_stages.push(shader_stage);
         shader_groups.push(shader_group);
 
+        let miss_index = 1;
         let (shader_stage, shader_group) = self.add_shader_stage(
             self.miss_shader.as_ref().unwrap(),
             vk::ShaderStageFlags::MISS_NV,
-            1,
+            miss_index,
         );
         shader_stages.push(shader_stage);
         shader_groups.push(shader_group);
 
+        let hit_group_index = 2;
         let (shader_stage, shader_group) =
-            self.add_closest_hit_shader(self.closest_hit_shader.as_ref().unwrap(), 2);
+            self.add_closest_hit_shader(self.closest_hit_shader.as_ref().unwrap(), hit_group_index);
         shader_stages.push(shader_stage);
         shader_groups.push(shader_group);
 
@@ -119,6 +131,9 @@ impl<'a> PipelineBuilder<'a> {
             device: Rc::clone(&self.context.device),
             pipeline_layout,
             pipeline,
+            ray_gen_index,
+            miss_index,
+            hit_group_index,
         })
     }
 

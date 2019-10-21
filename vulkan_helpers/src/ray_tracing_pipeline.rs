@@ -20,10 +20,12 @@ use crate::images::Image;
 use crate::material::Material;
 use crate::pipeline::{Pipeline, PipelineBuilder};
 use crate::ray_tracing::{RayTracing, RayTracingBuilder};
+use crate::shader_binding_table::{ShaderBindingTable, ShaderBindingTableBuilder};
 use crate::shader_module::ShaderModuleBuilder;
 use crate::vulkan_context::VulkanContext;
 
 pub struct RayTracingPipeline {
+    _sbt: ShaderBindingTable,
     _pipeline: Pipeline,
     descriptor_set: DescriptorSet,
     _top_level_as: AccelerationStructure,
@@ -102,6 +104,8 @@ impl<'a> RayTracingPipelineBuilder<'a> {
 
         let pipeline = self.create_pipeline(&ray_tracing, &descriptor_set)?;
 
+        let sbt = self.create_shader_binding_table(&ray_tracing, &pipeline)?;
+
         Ok(RayTracingPipeline {
             _ray_tracing: ray_tracing,
             _camera_buffer: camera_buffer,
@@ -110,6 +114,7 @@ impl<'a> RayTracingPipelineBuilder<'a> {
             _top_level_as: top_level_as,
             descriptor_set,
             _pipeline: pipeline,
+            _sbt: sbt,
         })
     }
 
@@ -197,5 +202,13 @@ impl<'a> RayTracingPipelineBuilder<'a> {
             .with_closest_hit_shader(closest_hit_module)
             .with_max_recursion_depth(1)
             .build()
+    }
+
+    fn create_shader_binding_table(
+        &self,
+        ray_tracing: &RayTracing,
+        pipeline: &Pipeline,
+    ) -> Result<ShaderBindingTable, VulkanError> {
+        ShaderBindingTableBuilder::new(&self.context, ray_tracing, pipeline).build()
     }
 }
