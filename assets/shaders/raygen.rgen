@@ -4,6 +4,15 @@
 layout(binding = 0, set = 0) uniform accelerationStructureNV topLevelAS;
 layout(binding = 1, set = 0, rgba8) uniform image2D image;
 
+layout(binding = 2, set = 0) uniform CameraProperties {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+    mat4 modelIT;
+    mat4 viewInverse;
+    mat4 projInverse;
+} cam;
+
 void main() 
 {
     imageStore(image, ivec2(gl_LaunchIDNV.xy), vec4(0.5, 0.5, 0.5, 1.0));

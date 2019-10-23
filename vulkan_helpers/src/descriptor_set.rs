@@ -2,8 +2,6 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::acceleration_structure::AccelerationStructure;
-use crate::buffer::Buffer;
 use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
 use crate::geometry_instance::GeometryInstance;
@@ -17,32 +15,136 @@ pub struct DescriptorSet {
 }
 
 impl DescriptorSet {
+    pub fn get(&self) -> vk::DescriptorSet {
+        self.descriptor_set
+    }
+
     pub fn get_layout(&self) -> vk::DescriptorSetLayout {
         self.descriptor_set_layout
     }
 
-    pub fn update_render_target(&self, target: vk::ImageView) {
+    pub fn update_render_target(
+        &mut self,
+        acceleration_structure: vk::AccelerationStructureNV,
+        target: vk::ImageView,
+        camera_buffer: vk::Buffer,
+        geometry_instance: &GeometryInstance,
+    ) {
+        let mut wds = vec![];
+
+        let mut as_info = vk::WriteDescriptorSetAccelerationStructureNV::builder()
+            .acceleration_structures(&[acceleration_structure])
+            .build();
+
+        let mut as_wds = vk::WriteDescriptorSet::builder()
+            .dst_set(self.descriptor_set)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::ACCELERATION_STRUCTURE_NV)
+            .dst_binding(0)
+            .push_next(&mut as_info)
+            .build();
+        as_wds.descriptor_count = 1;
+        wds.push(as_wds);
+
         let output_image_info = vk::DescriptorImageInfo::builder()
             .image_layout(vk::ImageLayout::GENERAL)
             .image_view(target)
             .build();
 
-        let textures_wds = vk::WriteDescriptorSet::builder()
+        let output_image_wds = vk::WriteDescriptorSet::builder()
             .dst_set(self.descriptor_set)
             .dst_array_element(0)
             .descriptor_type(vk::DescriptorType::STORAGE_IMAGE)
             .dst_binding(1)
             .image_info(&[output_image_info])
             .build();
+        wds.push(output_image_wds);
 
-        self.device.update_descriptor_sets(&[textures_wds]);
+        let cam_info = vk::DescriptorBufferInfo::builder()
+            .buffer(camera_buffer)
+            .offset(0)
+            .range(vk::WHOLE_SIZE)
+            .build();
+
+        let cam_wds = vk::WriteDescriptorSet::builder()
+            .dst_set(self.descriptor_set)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .dst_binding(2)
+            .buffer_info(&[cam_info])
+            .build();
+        wds.push(cam_wds);
+
+        let vertex_info = vk::DescriptorBufferInfo::builder()
+            .buffer(geometry_instance.vertex_buffer.get())
+            .offset(0)
+            .range(vk::WHOLE_SIZE)
+            .build();
+
+        let vertex_wds = vk::WriteDescriptorSet::builder()
+            .dst_set(self.descriptor_set)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+            .dst_binding(3)
+            .buffer_info(&[vertex_info])
+            .build();
+        wds.push(vertex_wds);
+
+        let index_info = vk::DescriptorBufferInfo::builder()
+            .buffer(geometry_instance.index_buffer.get())
+            .offset(0)
+            .range(vk::WHOLE_SIZE)
+            .build();
+
+        let index_wds = vk::WriteDescriptorSet::builder()
+            .dst_set(self.descriptor_set)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+            .dst_binding(4)
+            .buffer_info(&[index_info])
+            .build();
+        wds.push(index_wds);
+
+        let mat_info = vk::DescriptorBufferInfo::builder()
+            .buffer(geometry_instance.material_buffer.get())
+            .offset(0)
+            .range(vk::WHOLE_SIZE)
+            .build();
+
+        let mat_wds = vk::WriteDescriptorSet::builder()
+            .dst_set(self.descriptor_set)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+            .dst_binding(5)
+            .buffer_info(&[mat_info])
+            .build();
+        wds.push(mat_wds);
+
+        let mut image_infos = vec![];
+        for texture in geometry_instance.textures.iter() {
+            let image_info = vk::DescriptorImageInfo::builder()
+                .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                .image_view(texture.get_image_view())
+                .sampler(texture.get_sampler())
+                .build();
+            image_infos.push(image_info);
+        }
+
+        let textures_wds = vk::WriteDescriptorSet::builder()
+            .dst_set(self.descriptor_set)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .dst_binding(6)
+            .image_info(&image_infos)
+            .build();
+        wds.push(textures_wds);
+
+        self.device.update_descriptor_sets(&wds);
     }
 }
 
 impl Drop for DescriptorSet {
     fn drop(&mut self) {
-        self.device
-            .free_descriptor_sets(self.descriptor_pool, &[self.descriptor_set]);
         self.device
             .destroy_descriptor_set_layout(self.descriptor_set_layout);
         self.device.destroy_descriptor_pool(self.descriptor_pool);
@@ -51,23 +153,14 @@ impl Drop for DescriptorSet {
 
 pub struct DescriptorSetBuilder<'a> {
     context: &'a VulkanContext,
-    camera_buffer: &'a Buffer,
     geometry_instance: &'a GeometryInstance,
-    top_level_as: &'a AccelerationStructure,
 }
 
 impl<'a> DescriptorSetBuilder<'a> {
-    pub fn new(
-        context: &'a VulkanContext,
-        camera_buffer: &'a Buffer,
-        geometry_instance: &'a GeometryInstance,
-        top_level_as: &'a AccelerationStructure,
-    ) -> Self {
+    pub fn new(context: &'a VulkanContext, geometry_instance: &'a GeometryInstance) -> Self {
         DescriptorSetBuilder {
             context,
-            camera_buffer,
             geometry_instance,
-            top_level_as,
         }
     }
 
@@ -128,101 +221,6 @@ impl<'a> DescriptorSetBuilder<'a> {
         let descriptor_pool = self.generate_pool(&bindings)?;
         let descriptor_set_layout = self.generate_layout(&bindings)?;
         let descriptor_set = self.generate_set(descriptor_pool, descriptor_set_layout)?;
-
-        let mut wds = vec![];
-        let mut as_info = vk::WriteDescriptorSetAccelerationStructureNV::builder()
-            .acceleration_structures(&[self.top_level_as.get()])
-            .build();
-
-        let as_wds = vk::WriteDescriptorSet::builder()
-            .dst_set(descriptor_set)
-            .dst_array_element(0)
-            .descriptor_type(vk::DescriptorType::ACCELERATION_STRUCTURE_NV)
-            .dst_binding(0)
-            .push_next(&mut as_info)
-            .build();
-        wds.push(as_wds);
-
-        let cam_info = vk::DescriptorBufferInfo::builder()
-            .buffer(self.camera_buffer.get())
-            .offset(0)
-            .range(vk::WHOLE_SIZE)
-            .build();
-
-        let cam_wds = vk::WriteDescriptorSet::builder()
-            .dst_set(descriptor_set)
-            .dst_array_element(0)
-            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-            .dst_binding(2)
-            .buffer_info(&[cam_info])
-            .build();
-        wds.push(cam_wds);
-
-        let vertex_info = vk::DescriptorBufferInfo::builder()
-            .buffer(self.geometry_instance.vertex_buffer.get())
-            .offset(0)
-            .range(vk::WHOLE_SIZE)
-            .build();
-
-        let vertex_wds = vk::WriteDescriptorSet::builder()
-            .dst_set(descriptor_set)
-            .dst_array_element(0)
-            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-            .dst_binding(3)
-            .buffer_info(&[vertex_info])
-            .build();
-        wds.push(vertex_wds);
-
-        let index_info = vk::DescriptorBufferInfo::builder()
-            .buffer(self.geometry_instance.index_buffer.get())
-            .offset(0)
-            .range(vk::WHOLE_SIZE)
-            .build();
-
-        let index_wds = vk::WriteDescriptorSet::builder()
-            .dst_set(descriptor_set)
-            .dst_array_element(0)
-            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-            .dst_binding(4)
-            .buffer_info(&[index_info])
-            .build();
-        wds.push(index_wds);
-
-        let mat_info = vk::DescriptorBufferInfo::builder()
-            .buffer(self.geometry_instance.material_buffer.get())
-            .offset(0)
-            .range(vk::WHOLE_SIZE)
-            .build();
-
-        let mat_wds = vk::WriteDescriptorSet::builder()
-            .dst_set(descriptor_set)
-            .dst_array_element(0)
-            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-            .dst_binding(5)
-            .buffer_info(&[mat_info])
-            .build();
-        wds.push(mat_wds);
-
-        let mut image_infos = vec![];
-        for texture in self.geometry_instance.textures.iter() {
-            let image_info = vk::DescriptorImageInfo::builder()
-                .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-                .image_view(texture.get_image_view())
-                .sampler(texture.get_sampler())
-                .build();
-            image_infos.push(image_info);
-        }
-
-        let textures_wds = vk::WriteDescriptorSet::builder()
-            .dst_set(descriptor_set)
-            .dst_array_element(0)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .dst_binding(6)
-            .image_info(&image_infos)
-            .build();
-        wds.push(textures_wds);
-
-        self.context.device.update_descriptor_sets(&wds);
 
         Ok(DescriptorSet {
             device: Rc::clone(&self.context.device),

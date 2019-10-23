@@ -16,18 +16,20 @@ pub struct Vertex {
 
 #[repr(C, packed)]
 pub struct UniformBufferObject {
-    model: glm::Mat4,
-    view: glm::Mat4,
-    proj: glm::Mat4,
-    model_it: glm::Mat4,
+    pub model: glm::Mat4,
+    pub view: glm::Mat4,
+    pub proj: glm::Mat4,
+    pub model_it: glm::Mat4,
+    pub view_inverse: glm::Mat4,
+    pub proj_inverse: glm::Mat4,
 }
 
 pub struct GeometryInstance {
     pub vertex_buffer: Buffer,
-    pub vertex_count: usize,
+    pub vertex_count: u32,
     pub vertex_offset: u32,
     pub index_buffer: Buffer,
-    pub index_count: usize,
+    pub index_count: u32,
     pub index_offset: u32,
     pub material_buffer: Buffer,
     pub textures: Vec<Texture>,
@@ -83,10 +85,10 @@ impl<'a> GeometryInstanceBuilder<'a> {
 
         Ok(GeometryInstance {
             vertex_buffer,
-            vertex_count: self.vertices.len(),
+            vertex_count: self.vertices.len() as u32,
             vertex_offset: 0,
             index_buffer,
-            index_count: self.indices.len(),
+            index_count: self.indices.len() as u32,
             index_offset: 0,
             material_buffer,
             textures,

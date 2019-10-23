@@ -8,11 +8,11 @@ pub type PresentMode = vk::PresentModeKHR;
 
 pub struct PresentModeBuilder<'a> {
     surface: &'a Surface,
-    physical_device: PhysicalDevice,
+    physical_device: &'a PhysicalDevice,
 }
 
 impl<'a> PresentModeBuilder<'a> {
-    pub fn new(surface: &'a Surface, physical_device: PhysicalDevice) -> Self {
+    pub fn new(surface: &'a Surface, physical_device: &'a PhysicalDevice) -> Self {
         PresentModeBuilder {
             surface,
             physical_device,
@@ -22,7 +22,7 @@ impl<'a> PresentModeBuilder<'a> {
     pub fn build(self) -> Result<PresentMode, VulkanError> {
         let present_modes = self
             .surface
-            .get_physical_device_surface_present_modes(self.physical_device)?;
+            .get_physical_device_surface_present_modes(self.physical_device.get())?;
 
         let mut result = vk::PresentModeKHR::FIFO;
         for present_mode in present_modes {

@@ -163,7 +163,7 @@ impl<'a> BufferBuilder<'a> {
         let mem_properties = self
             .context
             .instance
-            .get_physical_device_memory_properties(self.context.physical_device);
+            .get_physical_device_memory_properties(self.context.physical_device.get());
 
         for i in 0..mem_properties.memory_type_count {
             if type_filter & (1 << i) != 0

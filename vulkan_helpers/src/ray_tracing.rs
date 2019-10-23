@@ -112,6 +112,42 @@ impl RayTracing {
         }
         .map_err(|err| VulkanError::RayTracingError(err.to_string()))
     }
+
+    pub fn cmd_trace_rays(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        ray_gen_sbt: vk::Buffer,
+        ray_gen_offset: vk::DeviceSize,
+        miss_sbt: vk::Buffer,
+        miss_offset: vk::DeviceSize,
+        miss_stride: vk::DeviceSize,
+        hit_group_sbt: vk::Buffer,
+        hit_group_offset: vk::DeviceSize,
+        hit_group_stride: vk::DeviceSize,
+        width: u32,
+        height: u32,
+        depth: u32,
+    ) {
+        unsafe {
+            self.ray_tracing.cmd_trace_rays(
+                command_buffer,
+                ray_gen_sbt,
+                ray_gen_offset,
+                miss_sbt,
+                miss_offset,
+                miss_stride,
+                hit_group_sbt,
+                hit_group_offset,
+                hit_group_stride,
+                vk::Buffer::null(),
+                0,
+                0,
+                width,
+                height,
+                depth,
+            )
+        }
+    }
 }
 
 pub struct RayTracingBuilder<'a> {
@@ -135,7 +171,7 @@ impl<'a> RayTracingBuilder<'a> {
 
         self.context
             .instance
-            .get_physical_device_properties2(self.context.physical_device, &mut props);
+            .get_physical_device_properties2(self.context.physical_device.get(), &mut props);
 
         let ray_tracing = ash::extensions::nv::RayTracing::new(
             self.context.instance.get(),

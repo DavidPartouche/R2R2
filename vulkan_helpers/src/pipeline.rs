@@ -23,6 +23,10 @@ impl Pipeline {
     pub fn get(&self) -> vk::Pipeline {
         self.pipeline
     }
+
+    pub fn get_layout(&self) -> vk::PipelineLayout {
+        self.pipeline_layout
+    }
 }
 
 impl Drop for Pipeline {

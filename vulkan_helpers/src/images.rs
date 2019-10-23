@@ -16,7 +16,7 @@ pub struct Image {
 pub(crate) fn create_image(
     instance: &VulkanInstance,
     device: &VulkanDevice,
-    physical_device: PhysicalDevice,
+    physical_device: &PhysicalDevice,
     width: u32,
     height: u32,
     format: vk::Format,
@@ -48,7 +48,7 @@ pub(crate) fn create_image(
 
     let memory_type_index = instance
         .find_memory_type(
-            physical_device,
+            physical_device.get(),
             mem_requirements.memory_type_bits,
             properties,
         )

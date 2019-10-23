@@ -8,11 +8,11 @@ pub type SurfaceFormat = vk::SurfaceFormatKHR;
 
 pub struct SurfaceFormatBuilder<'a> {
     surface: &'a Surface,
-    physical_device: PhysicalDevice,
+    physical_device: &'a PhysicalDevice,
 }
 
 impl<'a> SurfaceFormatBuilder<'a> {
-    pub fn new(surface: &'a Surface, physical_device: PhysicalDevice) -> Self {
+    pub fn new(surface: &'a Surface, physical_device: &'a PhysicalDevice) -> Self {
         SurfaceFormatBuilder {
             surface,
             physical_device,
@@ -22,7 +22,7 @@ impl<'a> SurfaceFormatBuilder<'a> {
     pub fn build(self) -> Result<SurfaceFormat, VulkanError> {
         let formats = self
             .surface
-            .get_physical_device_surface_formats(self.physical_device)?;
+            .get_physical_device_surface_formats(self.physical_device.get())?;
 
         let format = if formats.len() == 1 {
             if formats[0].format == vk::Format::UNDEFINED {

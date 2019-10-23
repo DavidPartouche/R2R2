@@ -73,7 +73,7 @@ impl<'a> TextureBuilder<'a> {
         let (texture_image, texture_image_memory) = images::create_image(
             &self.context.instance,
             &self.context.device,
-            self.context.physical_device,
+            &self.context.physical_device,
             image.tex_width,
             image.tex_height,
             vk::Format::R8G8B8A8_UNORM,

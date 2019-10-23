@@ -4,6 +4,7 @@ use std::ptr::null;
 use std::rc::Rc;
 
 use ash::vk;
+use nalgebra_glm as glm;
 
 use crate::buffer::{Buffer, BufferBuilder, BufferType};
 use crate::command_buffers::{CommandBuffers, CommandBuffersBuilder};
@@ -19,7 +20,6 @@ use crate::instance::{VulkanInstance, VulkanInstanceBuilder};
 use crate::material::Material;
 use crate::physical_device::{PhysicalDevice, PhysicalDeviceBuilder};
 use crate::present_mode::{PresentMode, PresentModeBuilder};
-use crate::queue_family::{QueueFamily, QueueFamilyBuilder};
 use crate::render_pass::{RenderPass, RenderPassBuilder};
 use crate::surface::{Surface, SurfaceBuilder};
 use crate::surface_format::{SurfaceFormat, SurfaceFormatBuilder};
@@ -29,7 +29,7 @@ use crate::texture::{Texture, TextureBuilder};
 pub struct VulkanContext {
     frame_buffers: FrameBuffers,
     _depth_resources: DepthResources,
-    _image_views: ImageViews,
+    back_buffer_views: ImageViews,
     pub(crate) render_pass: RenderPass,
     swapchain: Swapchain,
     pub(crate) command_buffers: CommandBuffers,
@@ -39,10 +39,10 @@ pub struct VulkanContext {
     pub(crate) instance: Rc<VulkanInstance>,
     frame_index: usize,
     frames_count: usize,
-    image_index: usize,
+    back_buffer_index: usize,
     pub(crate) width: u32,
     pub(crate) height: u32,
-    clear_value: [f32; 4],
+    clear_value: glm::Vec4,
 }
 
 impl Drop for VulkanContext {
@@ -52,7 +52,7 @@ impl Drop for VulkanContext {
 }
 
 impl VulkanContext {
-    pub fn set_clear_value(&mut self, clear_value: [f32; 4]) {
+    pub fn set_clear_value(&mut self, clear_value: glm::Vec4) {
         self.clear_value = clear_value;
     }
 
@@ -128,10 +128,18 @@ impl VulkanContext {
         Ok(buffer)
     }
 
+    pub fn get_current_back_buffer(&self) -> vk::Image {
+        self.swapchain.get_back_buffer(self.back_buffer_index)
+    }
+
+    pub fn get_current_back_buffer_view(&self) -> vk::ImageView {
+        self.back_buffer_views.get(self.back_buffer_index)
+    }
+
     pub fn frame_begin(&mut self) -> Result<(), VulkanError> {
         self.command_buffers.wait_for_fence(self.frame_index)?;
 
-        self.image_index = self.swapchain.acquire_next_image(
+        self.back_buffer_index = self.swapchain.acquire_next_image(
             self.command_buffers
                 .get_present_complete_semaphore(self.frame_index),
         )?;
@@ -149,7 +157,7 @@ impl VulkanContext {
         self.swapchain.queue_present(
             self.command_buffers
                 .get_render_complete_semaphore(self.frame_index),
-            self.image_index as u32,
+            self.back_buffer_index as u32,
         )?;
         self.frame_index = (self.frame_index + 1) % self.frames_count;
         Ok(())
@@ -158,7 +166,7 @@ impl VulkanContext {
     pub fn begin_render_pass(&self) {
         let clear_color = vk::ClearValue {
             color: vk::ClearColorValue {
-                float32: self.clear_value,
+                float32: self.clear_value.into(),
             },
         };
         let clear_depth = vk::ClearValue {
@@ -169,7 +177,7 @@ impl VulkanContext {
         };
         let info = vk::RenderPassBeginInfo::builder()
             .render_pass(self.render_pass.get())
-            .framebuffer(self.frame_buffers.get(self.image_index))
+            .framebuffer(self.frame_buffers.get(self.back_buffer_index))
             .render_area(
                 vk::Rect2D::builder()
                     .extent(
@@ -268,42 +276,40 @@ impl VulkanContextBuilder {
 
     pub fn build(self) -> Result<VulkanContext, VulkanError> {
         let instance = Rc::new(self.create_instance()?);
+
         let surface = self.create_surface(&instance)?;
-        let physical_device = self.get_physical_device(&instance, &surface)?;
-        let queue_family = self.get_queue_family(&instance, &surface, physical_device)?;
-        let surface_format = self.find_surface_format(&surface, physical_device)?;
-        let present_mode = self.get_present_mode(&surface, physical_device)?;
-        let device = Rc::new(self.create_logical_device(
-            Rc::clone(&instance),
-            physical_device,
-            queue_family,
-        )?);
-        let command_buffers = self.create_command_buffers(queue_family, Rc::clone(&device))?;
+
+        let physical_device = self.select_physical_device(&instance, &surface)?;
+
+        let surface_format = self.find_surface_format(&surface, &physical_device)?;
+        let present_mode = self.get_present_mode(&surface, &physical_device)?;
+        let device = Rc::new(self.create_logical_device(Rc::clone(&instance), &physical_device)?);
+        let command_buffers = self.create_command_buffers(&physical_device, Rc::clone(&device))?;
         let swapchain = self.create_swapchain(
             Rc::clone(&device),
             &surface,
-            physical_device,
+            &physical_device,
             surface_format,
             present_mode,
         )?;
         let render_pass = self.create_render_pass(
             &instance,
-            physical_device,
+            &physical_device,
             Rc::clone(&device),
             surface_format,
         )?;
-        let image_views =
+        let back_buffer_views =
             self.create_image_views(Rc::clone(&device), surface_format, &swapchain)?;
         let depth_resources = self.create_depth_resources(
             &instance,
-            physical_device,
+            &physical_device,
             Rc::clone(&device),
             &command_buffers,
         )?;
         let frame_buffers = self.create_frame_buffers(
             Rc::clone(&device),
             &render_pass,
-            &image_views,
+            &back_buffer_views,
             &depth_resources,
         )?;
 
@@ -315,15 +321,15 @@ impl VulkanContextBuilder {
             command_buffers,
             swapchain,
             render_pass,
-            _image_views: image_views,
+            back_buffer_views,
             _depth_resources: depth_resources,
             frame_buffers,
             frame_index: 0,
             frames_count: self.frames_count,
-            image_index: 0,
+            back_buffer_index: 0,
             width: self.width,
             height: self.height,
-            clear_value: [1.0, 1.0, 1.0, 1.0],
+            clear_value: glm::vec4(1.0, 1.0, 1.0, 1.0),
         })
     }
 
@@ -337,7 +343,7 @@ impl VulkanContextBuilder {
         SurfaceBuilder::new(instance).with_hwnd(self.hwnd).build()
     }
 
-    fn get_physical_device(
+    fn select_physical_device(
         &self,
         instance: &VulkanInstance,
         surface: &Surface,
@@ -347,19 +353,10 @@ impl VulkanContextBuilder {
             .build()
     }
 
-    fn get_queue_family(
-        &self,
-        instance: &VulkanInstance,
-        surface: &Surface,
-        physical_device: PhysicalDevice,
-    ) -> Result<QueueFamily, VulkanError> {
-        QueueFamilyBuilder::new(instance, surface, physical_device).build()
-    }
-
     fn find_surface_format(
         &self,
         surface: &Surface,
-        physical_device: PhysicalDevice,
+        physical_device: &PhysicalDevice,
     ) -> Result<SurfaceFormat, VulkanError> {
         SurfaceFormatBuilder::new(surface, physical_device).build()
     }
@@ -367,7 +364,7 @@ impl VulkanContextBuilder {
     fn get_present_mode(
         &self,
         surface: &Surface,
-        physical_device: PhysicalDevice,
+        physical_device: &PhysicalDevice,
     ) -> Result<PresentMode, VulkanError> {
         PresentModeBuilder::new(surface, physical_device).build()
     }
@@ -375,20 +372,19 @@ impl VulkanContextBuilder {
     fn create_logical_device(
         &self,
         instance: Rc<VulkanInstance>,
-        physical_device: PhysicalDevice,
-        queue_family: QueueFamily,
+        physical_device: &PhysicalDevice,
     ) -> Result<VulkanDevice, VulkanError> {
-        VulkanDeviceBuilder::new(instance, physical_device, queue_family)
+        VulkanDeviceBuilder::new(instance, physical_device)
             .with_extensions(&self.extensions)
             .build()
     }
 
     fn create_command_buffers(
         &self,
-        queue_family: QueueFamily,
+        physical_device: &PhysicalDevice,
         device: Rc<VulkanDevice>,
     ) -> Result<CommandBuffers, VulkanError> {
-        CommandBuffersBuilder::new(queue_family, device)
+        CommandBuffersBuilder::new(physical_device, device)
             .with_buffer_count(self.frames_count)
             .build()
     }
@@ -397,7 +393,7 @@ impl VulkanContextBuilder {
         &self,
         device: Rc<VulkanDevice>,
         surface: &Surface,
-        physical_device: PhysicalDevice,
+        physical_device: &PhysicalDevice,
         surface_format: SurfaceFormat,
         present_mode: PresentMode,
     ) -> Result<Swapchain, VulkanError> {
@@ -416,7 +412,7 @@ impl VulkanContextBuilder {
     fn create_render_pass(
         &self,
         instance: &VulkanInstance,
-        physical_device: PhysicalDevice,
+        physical_device: &PhysicalDevice,
         device: Rc<VulkanDevice>,
         surface_format: SurfaceFormat,
     ) -> Result<RenderPass, VulkanError> {
@@ -435,7 +431,7 @@ impl VulkanContextBuilder {
     fn create_depth_resources(
         &self,
         instance: &VulkanInstance,
-        physical_device: PhysicalDevice,
+        physical_device: &PhysicalDevice,
         device: Rc<VulkanDevice>,
         command_buffers: &CommandBuffers,
     ) -> Result<DepthResources, VulkanError> {

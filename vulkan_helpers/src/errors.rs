@@ -8,7 +8,6 @@ pub enum VulkanError {
     InstanceError(String),
     SurfaceError(String),
     PhysicalDeviceCreationError(String),
-    QueueFamilyCreationError(String),
     DeviceError(String),
     SwapchainCreationError(String),
     RenderPassCreationError(String),

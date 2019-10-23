@@ -24,6 +24,10 @@ impl ImageViews {
     pub fn get_image_views(&self) -> &Vec<vk::ImageView> {
         &self.back_buffer_views
     }
+
+    pub fn get(&self, index: usize) -> vk::ImageView {
+        self.back_buffer_views[index]
+    }
 }
 
 pub struct ImageViewsBuilder<'a> {

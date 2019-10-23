@@ -27,7 +27,7 @@ impl RenderPass {
 
 pub struct RenderPassBuilder<'a> {
     instance: &'a VulkanInstance,
-    physical_device: PhysicalDevice,
+    physical_device: &'a PhysicalDevice,
     device: Rc<VulkanDevice>,
     surface_format: SurfaceFormat,
 }
@@ -35,7 +35,7 @@ pub struct RenderPassBuilder<'a> {
 impl<'a> RenderPassBuilder<'a> {
     pub fn new(
         instance: &'a VulkanInstance,
-        physical_device: PhysicalDevice,
+        physical_device: &'a PhysicalDevice,
         device: Rc<VulkanDevice>,
         surface_format: SurfaceFormat,
     ) -> Self {
@@ -66,7 +66,7 @@ impl<'a> RenderPassBuilder<'a> {
 
         let format = self
             .instance
-            .find_depth_format(self.physical_device)
+            .find_depth_format(self.physical_device.get())
             .ok_or_else(|| {
                 VulkanError::RenderPassCreationError(String::from("Cannot find depth format"))
             })?;

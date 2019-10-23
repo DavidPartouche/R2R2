@@ -14,7 +14,7 @@ impl Application {
         window
             .expect("Window already running, call run only once!")
             .run(|| {
-                self.renderer.draw_frame();
+                self.renderer.draw();
             });
     }
 }

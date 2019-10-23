@@ -4,7 +4,7 @@ use ash::vk;
 
 use crate::device::VulkanDevice;
 use crate::errors::VulkanError;
-use crate::queue_family::QueueFamily;
+use crate::physical_device::PhysicalDevice;
 
 pub struct CommandBuffers {
     device: Rc<VulkanDevice>,
@@ -136,16 +136,16 @@ impl CommandBuffers {
     }
 }
 
-pub struct CommandBuffersBuilder {
-    queue_family: QueueFamily,
+pub struct CommandBuffersBuilder<'a> {
+    physical_device: &'a PhysicalDevice,
     device: Rc<VulkanDevice>,
     buffer_count: usize,
 }
 
-impl CommandBuffersBuilder {
-    pub fn new(queue_family: QueueFamily, device: Rc<VulkanDevice>) -> Self {
+impl<'a> CommandBuffersBuilder<'a> {
+    pub fn new(physical_device: &'a PhysicalDevice, device: Rc<VulkanDevice>) -> Self {
         Self {
-            queue_family,
+            physical_device,
             device,
             buffer_count: 1,
         }
@@ -166,7 +166,7 @@ impl CommandBuffersBuilder {
         for i in 0..self.buffer_count {
             let pool_info = vk::CommandPoolCreateInfo::builder()
                 .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
-                .queue_family_index(self.queue_family)
+                .queue_family_index(self.physical_device.get_queue_family())
                 .build();
             command_pools.push(self.device.create_command_pool(&pool_info)?);
 

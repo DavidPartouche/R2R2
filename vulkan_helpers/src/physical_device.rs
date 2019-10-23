@@ -16,7 +16,20 @@ impl QueueFamilyIndices {
     }
 }
 
-pub type PhysicalDevice = vk::PhysicalDevice;
+pub struct PhysicalDevice {
+    physical_device: vk::PhysicalDevice,
+    queue_family: u32,
+}
+
+impl PhysicalDevice {
+    pub fn get(&self) -> vk::PhysicalDevice {
+        self.physical_device
+    }
+
+    pub fn get_queue_family(&self) -> u32 {
+        self.queue_family
+    }
+}
 
 pub struct PhysicalDeviceBuilder<'a> {
     instance: &'a VulkanInstance,
@@ -49,7 +62,30 @@ impl<'a> PhysicalDeviceBuilder<'a> {
                 ))
             })?;
 
-        Ok(physical_device)
+        let queue_family = self
+            .instance
+            .get_physical_device_queue_family_properties(physical_device)
+            .into_iter()
+            .enumerate()
+            .find_map(|(index, queue)| {
+                if queue.queue_flags.contains(vk::QueueFlags::GRAPHICS)
+                    && self
+                        .surface
+                        .get_physical_device_surface_support(physical_device, index as u32)
+                {
+                    Some(index as u32)
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| {
+                VulkanError::PhysicalDeviceCreationError(String::from("Cannot find queue family"))
+            })?;
+
+        Ok(PhysicalDevice {
+            physical_device,
+            queue_family,
+        })
     }
 
     fn is_device_suitable(&self, device: vk::PhysicalDevice) -> bool {

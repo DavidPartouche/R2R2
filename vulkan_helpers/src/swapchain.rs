@@ -27,6 +27,10 @@ impl Drop for Swapchain {
 }
 
 impl Swapchain {
+    pub fn get_back_buffer(&self, index: usize) -> vk::Image {
+        self.back_buffers[index]
+    }
+
     pub fn get_back_buffers(&self) -> &Vec<vk::Image> {
         &self.back_buffers
     }
@@ -67,7 +71,7 @@ impl Swapchain {
 pub struct SwapchainBuilder<'a> {
     device: Rc<VulkanDevice>,
     surface: &'a Surface,
-    physical_device: PhysicalDevice,
+    physical_device: &'a PhysicalDevice,
     surface_format: SurfaceFormat,
     present_mode: PresentMode,
     width: u32,
@@ -78,7 +82,7 @@ impl<'a> SwapchainBuilder<'a> {
     pub fn new(
         device: Rc<VulkanDevice>,
         surface: &'a Surface,
-        physical_device: PhysicalDevice,
+        physical_device: &'a PhysicalDevice,
         surface_format: SurfaceFormat,
         present_mode: PresentMode,
     ) -> Self {
@@ -106,7 +110,7 @@ impl<'a> SwapchainBuilder<'a> {
     pub fn build(self) -> Result<Swapchain, VulkanError> {
         let cap = self
             .surface
-            .get_physical_device_surface_capabilities(self.physical_device)?;
+            .get_physical_device_surface_capabilities(self.physical_device.get())?;
 
         let image_count = if cap.max_image_count > 0 {
             cap.max_image_count.min(cap.min_image_count + 2)

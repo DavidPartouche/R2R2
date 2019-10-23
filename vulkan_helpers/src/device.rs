@@ -10,7 +10,6 @@ use crate::errors::VulkanError;
 use crate::extensions::DeviceExtensions;
 use crate::instance::VulkanInstance;
 use crate::physical_device::PhysicalDevice;
-use crate::queue_family::QueueFamily;
 
 const FENCE_TIMEOUT: u64 = 100;
 
@@ -288,14 +287,6 @@ impl VulkanDevice {
             .map_err(|err| VulkanError::DeviceError(err.to_string()))
     }
 
-    pub fn free_descriptor_sets(
-        &self,
-        pool: vk::DescriptorPool,
-        descriptor_sets: &[vk::DescriptorSet],
-    ) {
-        unsafe { self.device.free_descriptor_sets(pool, descriptor_sets) }
-    }
-
     pub fn update_descriptor_sets(&self, descriptor_writes: &[vk::WriteDescriptorSet]) {
         unsafe { self.device.update_descriptor_sets(descriptor_writes, &[]) }
     }
@@ -382,10 +373,15 @@ impl VulkanDevice {
         }
     }
 
-    pub fn cmd_bind_pipeline(&self, command_buffer: vk::CommandBuffer, pipeline: vk::Pipeline) {
+    pub fn cmd_bind_pipeline(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        bind: vk::PipelineBindPoint,
+        pipeline: vk::Pipeline,
+    ) {
         unsafe {
             self.device
-                .cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, pipeline)
+                .cmd_bind_pipeline(command_buffer, bind, pipeline)
         }
     }
 
@@ -404,31 +400,6 @@ impl VulkanDevice {
                 descriptor_sets,
                 &[],
             );
-        }
-    }
-
-    pub fn cmd_bind_vertex_buffers(
-        &self,
-        command_buffer: vk::CommandBuffer,
-        buffers: &[vk::Buffer],
-    ) {
-        unsafe {
-            self.device
-                .cmd_bind_vertex_buffers(command_buffer, 0, buffers, &[0]);
-        }
-    }
-
-    pub fn cmd_bind_index_buffer(&self, command_buffer: vk::CommandBuffer, buffer: vk::Buffer) {
-        unsafe {
-            self.device
-                .cmd_bind_index_buffer(command_buffer, buffer, 0, vk::IndexType::UINT32);
-        }
-    }
-
-    pub fn cmd_draw_indexed(&self, command_buffer: vk::CommandBuffer, indices_count: u32) {
-        unsafe {
-            self.device
-                .cmd_draw_indexed(command_buffer, indices_count, 1, 0, 0, 0);
         }
     }
 
@@ -485,21 +456,15 @@ impl VulkanDevice {
 
 pub struct VulkanDeviceBuilder<'a> {
     instance: Rc<VulkanInstance>,
-    physical_device: PhysicalDevice,
-    queue_family: QueueFamily,
+    physical_device: &'a PhysicalDevice,
     extensions: Option<&'a [DeviceExtensions]>,
 }
 
 impl<'a> VulkanDeviceBuilder<'a> {
-    pub fn new(
-        instance: Rc<VulkanInstance>,
-        physical_device: PhysicalDevice,
-        queue_family: QueueFamily,
-    ) -> Self {
+    pub fn new(instance: Rc<VulkanInstance>, physical_device: &'a PhysicalDevice) -> Self {
         VulkanDeviceBuilder {
             instance,
             physical_device,
-            queue_family,
             extensions: None,
         }
     }
@@ -513,7 +478,7 @@ impl<'a> VulkanDeviceBuilder<'a> {
         let queue_priority = [1.];
 
         let queue_info = vk::DeviceQueueCreateInfo::builder()
-            .queue_family_index(self.queue_family)
+            .queue_family_index(self.physical_device.get_queue_family())
             .queue_priorities(&queue_priority)
             .build();
 
@@ -542,9 +507,9 @@ impl<'a> VulkanDeviceBuilder<'a> {
 
         let device = self
             .instance
-            .create_device(self.physical_device, &create_info)?;
+            .create_device(self.physical_device.get(), &create_info)?;
 
-        let queue = unsafe { device.get_device_queue(self.queue_family, 0) };
+        let queue = unsafe { device.get_device_queue(self.physical_device.get_queue_family(), 0) };
 
         Ok(VulkanDevice {
             instance: self.instance,

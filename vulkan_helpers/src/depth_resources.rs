@@ -32,7 +32,7 @@ impl DepthResources {
 
 pub struct DepthResourcesBuilder<'a> {
     instance: &'a VulkanInstance,
-    physical_device: PhysicalDevice,
+    physical_device: &'a PhysicalDevice,
     device: Rc<VulkanDevice>,
     command_buffers: &'a CommandBuffers,
     width: u32,
@@ -42,7 +42,7 @@ pub struct DepthResourcesBuilder<'a> {
 impl<'a> DepthResourcesBuilder<'a> {
     pub fn new(
         instance: &'a VulkanInstance,
-        physical_device: PhysicalDevice,
+        physical_device: &'a PhysicalDevice,
         device: Rc<VulkanDevice>,
         command_buffers: &'a CommandBuffers,
     ) -> Self {
@@ -69,14 +69,14 @@ impl<'a> DepthResourcesBuilder<'a> {
     pub fn build(self) -> Result<DepthResources, VulkanError> {
         let depth_format = self
             .instance
-            .find_depth_format(self.physical_device)
+            .find_depth_format(self.physical_device.get())
             .ok_or_else(|| {
                 VulkanError::DepthResourcesCreationError(String::from("Cannot find depth format"))
             })?;
         let (depth_image, depth_image_memory) = images::create_image(
             self.instance,
             &self.device,
-            self.physical_device,
+            &self.physical_device,
             self.width,
             self.height,
             depth_format,

@@ -11,6 +11,8 @@ use crate::model::Model;
 pub struct Renderer {
     context: VulkanContext,
     pipeline: Option<RayTracingPipeline>,
+    width: u32,
+    height: u32,
 }
 
 impl Renderer {
@@ -33,7 +35,13 @@ impl Renderer {
         Self {
             context,
             pipeline: None,
+            width,
+            height,
         }
+    }
+
+    pub fn set_clear_color(&mut self, clear_color: glm::Vec4) {
+        self.context.set_clear_value(clear_color);
     }
 
     pub fn load_model(&mut self, filename: &Path) {
@@ -50,11 +58,13 @@ impl Renderer {
         self.pipeline = Some(ray_tracing_pipeline);
     }
 
-    pub fn set_clear_value(&mut self, clear_value: glm::Vec4) {
-        self.context.set_clear_value(clear_value.into());
-    }
+    pub fn draw(&mut self) {
+        let pipeline = self.pipeline.as_mut().unwrap();
 
-    pub fn draw_frame(&mut self) {
-        self.pipeline.as_ref().unwrap().draw();
+        pipeline
+            .update_camera_buffer(self.width as f32, self.height as f32)
+            .unwrap();
+
+        pipeline.draw(&mut self.context).unwrap();
     }
 }

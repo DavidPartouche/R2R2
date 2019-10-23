@@ -10,7 +10,19 @@ use crate::ray_tracing::RayTracing;
 use crate::vulkan_context::VulkanContext;
 
 pub struct ShaderBindingTable {
-    _sbt_buffer: Buffer,
+    sbt_buffer: Buffer,
+    pub ray_gen_entry_size: vk::DeviceSize,
+    pub ray_gen_offset: vk::DeviceSize,
+    pub miss_entry_size: vk::DeviceSize,
+    pub miss_offset: vk::DeviceSize,
+    pub hit_group_entry_size: vk::DeviceSize,
+    pub hit_group_offset: vk::DeviceSize,
+}
+
+impl ShaderBindingTable {
+    pub fn get(&self) -> vk::Buffer {
+        self.sbt_buffer.get()
+    }
 }
 
 pub struct ShaderBindingTableBuilder<'a> {
@@ -48,7 +60,8 @@ impl<'a> ShaderBindingTableBuilder<'a> {
 
         let group_count: u32 = 3;
 
-        let mut shader_handle_storage = Vec::with_capacity((group_count * prog_id_size) as usize);
+        let mut shader_handle_storage = vec![0; (group_count * prog_id_size) as usize];
+
         self.ray_tracing.get_ray_tracing_shader_group_handles(
             self.pipeline.get(),
             0,
@@ -86,8 +99,18 @@ impl<'a> ShaderBindingTableBuilder<'a> {
 
         self.context.device.unmap_memory(sbt_buffer.get_memory());
 
+        let ray_gen_offset = 0;
+        let miss_offset = ray_gen_entry_size;
+        let hit_group_offset = ray_gen_entry_size + miss_entry_size;
+
         Ok(ShaderBindingTable {
-            _sbt_buffer: sbt_buffer,
+            sbt_buffer,
+            ray_gen_entry_size,
+            ray_gen_offset,
+            miss_entry_size,
+            miss_offset,
+            hit_group_entry_size,
+            hit_group_offset,
         })
     }
 

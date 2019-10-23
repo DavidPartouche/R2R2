@@ -1,4 +1,5 @@
 use std::mem;
+use std::os::raw::c_void;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -16,6 +17,7 @@ use crate::errors::VulkanError;
 use crate::geometry_instance::{
     GeometryInstance, GeometryInstanceBuilder, UniformBufferObject, Vertex,
 };
+use crate::glm;
 use crate::images::Image;
 use crate::material::Material;
 use crate::pipeline::{Pipeline, PipelineBuilder};
@@ -25,20 +27,145 @@ use crate::shader_module::ShaderModuleBuilder;
 use crate::vulkan_context::VulkanContext;
 
 pub struct RayTracingPipeline {
-    _sbt: ShaderBindingTable,
-    _pipeline: Pipeline,
+    sbt: ShaderBindingTable,
+    pipeline: Pipeline,
     descriptor_set: DescriptorSet,
-    _top_level_as: AccelerationStructure,
+    top_level_as: AccelerationStructure,
     _bottom_level_as: Vec<AccelerationStructure>,
-    _geometry_instance: GeometryInstance,
-    _camera_buffer: Buffer,
-    _ray_tracing: Rc<RayTracing>,
+    geometry_instance: GeometryInstance,
+    camera_buffer: Buffer,
+    ray_tracing: Rc<RayTracing>,
 }
 
 impl RayTracingPipeline {
-    pub fn draw(&self) {
-        self.descriptor_set
-            .update_render_target(vk::ImageView::null());
+    pub fn update_camera_buffer(&self, width: f32, height: f32) -> Result<(), VulkanError> {
+        let model = glm::identity();
+        let model_it = glm::inverse_transpose(model);
+        let view = glm::look_at(
+            &glm::vec3(4.0, 4.0, 4.0),
+            &glm::vec3(0.0, 0.0, 0.0),
+            &glm::vec3(0.0, 1.0, 0.0),
+        );
+        let aspect_ratio = width / height;
+        let mut proj = glm::perspective(f32::to_radians(65.0), aspect_ratio, 0.1, 1000.0);
+        proj[(1, 1)] = -proj[(1, 1)];
+        let view_inverse = glm::inverse(&view);
+        let proj_inverse = glm::inverse(&proj);
+
+        let ubo = UniformBufferObject {
+            model,
+            view,
+            proj,
+            model_it,
+            view_inverse,
+            proj_inverse,
+        };
+
+        let data = &ubo as *const UniformBufferObject as *const c_void;
+
+        self.camera_buffer.copy_data(data)
+    }
+
+    pub fn draw(&mut self, context: &mut VulkanContext) -> Result<(), VulkanError> {
+        context.frame_begin()?;
+        let command_buffer = context.get_current_command_buffer();
+
+        self.create_image_barrier(
+            context,
+            command_buffer,
+            vk::AccessFlags::empty(),
+            vk::AccessFlags::TRANSFER_WRITE,
+            vk::ImageLayout::UNDEFINED,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+        );
+
+        self.descriptor_set.update_render_target(
+            self.top_level_as.get(),
+            context.get_current_back_buffer_view(),
+            self.camera_buffer.get(),
+            &self.geometry_instance,
+        );
+
+        context.begin_render_pass();
+        context.device.cmd_bind_pipeline(
+            command_buffer,
+            vk::PipelineBindPoint::RAY_TRACING_NV,
+            self.pipeline.get(),
+        );
+
+        context.device.cmd_bind_descriptor_sets(
+            command_buffer,
+            self.pipeline.get_layout(),
+            &[self.descriptor_set.get()],
+        );
+
+        self.ray_tracing.cmd_trace_rays(
+            command_buffer,
+            self.sbt.get(),
+            self.sbt.ray_gen_offset,
+            self.sbt.get(),
+            self.sbt.miss_offset,
+            self.sbt.miss_entry_size,
+            self.sbt.get(),
+            self.sbt.hit_group_offset,
+            self.sbt.hit_group_entry_size,
+            context.width,
+            context.height,
+            1,
+        );
+
+        self.create_image_barrier(
+            context,
+            command_buffer,
+            vk::AccessFlags::TRANSFER_WRITE,
+            vk::AccessFlags::empty(),
+            vk::ImageLayout::GENERAL,
+            vk::ImageLayout::PRESENT_SRC_KHR,
+        );
+
+        context.device.cmd_next_subpass(command_buffer);
+        context.end_render_pass();
+        context.frame_end()?;
+        context.frame_present()
+    }
+
+    fn create_image_barrier(
+        &self,
+        context: &VulkanContext,
+        command_buffer: vk::CommandBuffer,
+        src_access_mask: vk::AccessFlags,
+        dst_access_mask: vk::AccessFlags,
+        old_layout: vk::ImageLayout,
+        new_layout: vk::ImageLayout,
+    ) {
+        let subresource_range = vk::ImageSubresourceRange::builder()
+            .aspect_mask(vk::ImageAspectFlags::COLOR)
+            .base_mip_level(0)
+            .level_count(1)
+            .base_array_layer(0)
+            .layer_count(1)
+            .build();
+
+        let image_memory_barrier = vk::ImageMemoryBarrier::builder()
+            .src_access_mask(src_access_mask)
+            .dst_access_mask(dst_access_mask)
+            .old_layout(old_layout)
+            .new_layout(new_layout)
+            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .image(context.get_current_back_buffer())
+            .subresource_range(subresource_range)
+            .build();
+
+        context.device.cmd_pipeline_barrier(
+            command_buffer,
+            vk::PipelineStageFlags::ALL_COMMANDS,
+            vk::PipelineStageFlags::ALL_COMMANDS,
+            vk::DependencyFlags::empty(),
+            &[],
+            &[],
+            &[image_memory_barrier],
+        );
     }
 }
 
@@ -99,22 +226,21 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         let (bottom_level_as, top_level_as) =
             self.create_acceleration_structures(Rc::clone(&ray_tracing), &geometry_instance)?;
 
-        let descriptor_set =
-            self.create_descriptor_set(&camera_buffer, &geometry_instance, &top_level_as)?;
+        let descriptor_set = self.create_descriptor_set(&geometry_instance)?;
 
         let pipeline = self.create_pipeline(&ray_tracing, &descriptor_set)?;
 
         let sbt = self.create_shader_binding_table(&ray_tracing, &pipeline)?;
 
         Ok(RayTracingPipeline {
-            _ray_tracing: ray_tracing,
-            _camera_buffer: camera_buffer,
-            _geometry_instance: geometry_instance,
+            ray_tracing,
+            camera_buffer,
+            geometry_instance,
             _bottom_level_as: bottom_level_as,
-            _top_level_as: top_level_as,
+            top_level_as,
             descriptor_set,
-            _pipeline: pipeline,
-            _sbt: sbt,
+            pipeline,
+            sbt,
         })
     }
 
@@ -158,27 +284,19 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         BottomLevelAccelerationStructureBuilder::new()
             .with_vertex_buffer(geom.vertex_buffer.get())
             .with_vertex_offset(geom.vertex_offset)
-            .with_vertex_count(geom.vertex_count as u32)
+            .with_vertex_count(geom.vertex_count)
             .with_vertex_size(mem::size_of::<Vertex>() as u32)
             .with_index_buffer(geom.index_buffer.get())
             .with_index_offset(geom.index_offset)
-            .with_index_count(geom.index_count as u32)
+            .with_index_count(geom.index_count)
             .build()
     }
 
     fn create_descriptor_set(
         &self,
-        camera_buffer: &Buffer,
         geometry_instance: &GeometryInstance,
-        top_level_as: &AccelerationStructure,
     ) -> Result<DescriptorSet, VulkanError> {
-        DescriptorSetBuilder::new(
-            &self.context,
-            camera_buffer,
-            geometry_instance,
-            top_level_as,
-        )
-        .build()
+        DescriptorSetBuilder::new(&self.context, geometry_instance).build()
     }
 
     fn create_pipeline(
