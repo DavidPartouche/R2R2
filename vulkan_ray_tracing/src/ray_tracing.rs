@@ -1,7 +1,6 @@
 use ash::vk;
-
-use crate::errors::VulkanError;
-use crate::vulkan_context::VulkanContext;
+use vulkan_bootstrap::errors::VulkanError;
+use vulkan_bootstrap::vulkan_context::VulkanContext;
 
 pub struct RayTracing {
     ray_tracing: ash::extensions::nv::RayTracing,
@@ -18,7 +17,7 @@ impl RayTracing {
         info: &vk::AccelerationStructureCreateInfoNV,
     ) -> Result<vk::AccelerationStructureNV, VulkanError> {
         unsafe { self.ray_tracing.create_acceleration_structure(info, None) }
-            .map_err(|err| VulkanError::RayTracingError(err.to_string()))
+            .map_err(|err| VulkanError::PipelineError(err.to_string()))
     }
 
     pub fn destroy_acceleration_structure(
@@ -39,7 +38,7 @@ impl RayTracing {
             self.ray_tracing
                 .get_acceleration_structure_handle(accel_struct)
         }
-        .map_err(|err| VulkanError::RayTracingError(err.to_string()))
+        .map_err(|err| VulkanError::PipelineError(err.to_string()))
     }
 
     pub fn get_acceleration_structure_memory_requirements(
@@ -57,7 +56,7 @@ impl RayTracing {
         info: &[vk::BindAccelerationStructureMemoryInfoNV],
     ) -> Result<(), VulkanError> {
         unsafe { self.ray_tracing.bind_acceleration_structure_memory(info) }
-            .map_err(|err| VulkanError::RayTracingError(err.to_string()))
+            .map_err(|err| VulkanError::PipelineError(err.to_string()))
     }
 
     pub fn cmd_build_acceleration_structure(
@@ -92,7 +91,7 @@ impl RayTracing {
             self.ray_tracing
                 .create_ray_tracing_pipelines(vk::PipelineCache::null(), info, None)
         }
-        .map_err(|err| VulkanError::RayTracingError(err.to_string()))
+        .map_err(|err| VulkanError::PipelineError(err.to_string()))
     }
 
     pub fn get_ray_tracing_shader_group_handles(
@@ -110,7 +109,7 @@ impl RayTracing {
                 data,
             )
         }
-        .map_err(|err| VulkanError::RayTracingError(err.to_string()))
+        .map_err(|err| VulkanError::PipelineError(err.to_string()))
     }
 
     pub fn cmd_trace_rays(
@@ -170,12 +169,12 @@ impl<'a> RayTracingBuilder<'a> {
             .build();
 
         self.context
-            .instance
-            .get_physical_device_properties2(self.context.physical_device.get(), &mut props);
+            .get_instance()
+            .get_physical_device_properties2(self.context.get_physical_device().get(), &mut props);
 
         let ray_tracing = ash::extensions::nv::RayTracing::new(
-            self.context.instance.get(),
-            self.context.device.get(),
+            self.context.get_instance().get(),
+            self.context.get_device().get(),
         );
 
         Ok(RayTracing {

@@ -2,12 +2,12 @@ use std::os::raw::c_void;
 use std::ptr;
 
 use ash::vk;
+use vulkan_bootstrap::buffer::{Buffer, BufferBuilder, BufferType};
+use vulkan_bootstrap::errors::VulkanError;
+use vulkan_bootstrap::vulkan_context::VulkanContext;
 
-use crate::buffer::{Buffer, BufferBuilder, BufferType};
-use crate::errors::VulkanError;
 use crate::pipeline::Pipeline;
 use crate::ray_tracing::RayTracing;
-use crate::vulkan_context::VulkanContext;
 
 pub struct ShaderBindingTable {
     sbt_buffer: Buffer,
@@ -71,7 +71,7 @@ impl<'a> ShaderBindingTableBuilder<'a> {
 
         let data = self
             .context
-            .device
+            .get_device()
             .map_memory(sbt_buffer.get_memory(), sbt_size)?;
 
         self.copy_shader_data(
@@ -97,7 +97,9 @@ impl<'a> ShaderBindingTableBuilder<'a> {
             prog_id_size,
         );
 
-        self.context.device.unmap_memory(sbt_buffer.get_memory());
+        self.context
+            .get_device()
+            .unmap_memory(sbt_buffer.get_memory());
 
         let ray_gen_offset = 0;
         let miss_offset = ray_gen_entry_size;

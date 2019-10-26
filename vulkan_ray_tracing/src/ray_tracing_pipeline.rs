@@ -4,6 +4,12 @@ use std::path::Path;
 use std::rc::Rc;
 
 use ash::vk;
+use nalgebra_glm as glm;
+use vulkan_bootstrap::buffer::{Buffer, BufferBuilder, BufferType};
+use vulkan_bootstrap::errors::VulkanError;
+use vulkan_bootstrap::image::Image;
+use vulkan_bootstrap::shader_module::ShaderModuleBuilder;
+use vulkan_bootstrap::vulkan_context::VulkanContext;
 
 use crate::acceleration_structure::{
     AccelerationStructure, AccelerationStructureBuilder, Instance,
@@ -11,20 +17,14 @@ use crate::acceleration_structure::{
 use crate::bottom_level_acceleration_structure::{
     BottomLevelAccelerationStructure, BottomLevelAccelerationStructureBuilder,
 };
-use crate::buffer::{Buffer, BufferBuilder, BufferType};
 use crate::descriptor_set::{DescriptorSet, DescriptorSetBuilder};
-use crate::errors::VulkanError;
 use crate::geometry_instance::{
     GeometryInstance, GeometryInstanceBuilder, UniformBufferObject, Vertex,
 };
-use crate::glm;
-use crate::images::Image;
 use crate::material::Material;
 use crate::pipeline::{Pipeline, PipelineBuilder};
 use crate::ray_tracing::{RayTracing, RayTracingBuilder};
 use crate::shader_binding_table::{ShaderBindingTable, ShaderBindingTableBuilder};
-use crate::shader_module::ShaderModuleBuilder;
-use crate::vulkan_context::VulkanContext;
 
 pub struct RayTracingPipeline {
     sbt: ShaderBindingTable,
@@ -87,13 +87,13 @@ impl RayTracingPipeline {
         );
 
         context.begin_render_pass();
-        context.device.cmd_bind_pipeline(
+        context.get_device().cmd_bind_pipeline(
             command_buffer,
             vk::PipelineBindPoint::RAY_TRACING_NV,
             self.pipeline.get(),
         );
 
-        context.device.cmd_bind_descriptor_sets(
+        context.get_device().cmd_bind_descriptor_sets(
             command_buffer,
             self.pipeline.get_layout(),
             &[self.descriptor_set.get()],
@@ -109,8 +109,8 @@ impl RayTracingPipeline {
             self.sbt.get(),
             self.sbt.hit_group_offset,
             self.sbt.hit_group_entry_size,
-            context.width,
-            context.height,
+            context.get_swapchain().get_extent().width,
+            context.get_swapchain().get_extent().height,
             1,
         );
 
@@ -123,7 +123,7 @@ impl RayTracingPipeline {
             vk::ImageLayout::PRESENT_SRC_KHR,
         );
 
-        context.device.cmd_next_subpass(command_buffer);
+        context.get_device().cmd_next_subpass(command_buffer);
         context.end_render_pass();
         context.frame_end()?;
         context.frame_present()
@@ -157,7 +157,7 @@ impl RayTracingPipeline {
             .subresource_range(subresource_range)
             .build();
 
-        context.device.cmd_pipeline_barrier(
+        context.get_device().cmd_pipeline_barrier(
             command_buffer,
             vk::PipelineStageFlags::ALL_COMMANDS,
             vk::PipelineStageFlags::ALL_COMMANDS,
@@ -304,13 +304,13 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         ray_tracing: &RayTracing,
         descriptor_set: &DescriptorSet,
     ) -> Result<Pipeline, VulkanError> {
-        let ray_gen_module = ShaderModuleBuilder::new(Rc::clone(&self.context.device))
+        let ray_gen_module = ShaderModuleBuilder::new(Rc::clone(&self.context.get_device()))
             .with_path(Path::new("assets/shaders/raygen.spv"))
             .build()?;
-        let miss_module = ShaderModuleBuilder::new(Rc::clone(&self.context.device))
+        let miss_module = ShaderModuleBuilder::new(Rc::clone(&self.context.get_device()))
             .with_path(Path::new("assets/shaders/miss.spv"))
             .build()?;
-        let closest_hit_module = ShaderModuleBuilder::new(Rc::clone(&self.context.device))
+        let closest_hit_module = ShaderModuleBuilder::new(Rc::clone(&self.context.get_device()))
             .with_path(Path::new("assets/shaders/closesthit.spv"))
             .build()?;
 

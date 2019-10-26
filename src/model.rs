@@ -1,8 +1,10 @@
 use std::path::Path;
 
-use vulkan_helpers::images::Image;
-use vulkan_helpers::material::Material;
-use vulkan_helpers::{glm, Vertex};
+use vulkan_bootstrap::image::Image;
+
+use vulkan_ray_tracing::geometry_instance::Vertex;
+use vulkan_ray_tracing::glm;
+use vulkan_ray_tracing::material::Material;
 
 pub struct Model {
     pub vertices: Vec<Vertex>,

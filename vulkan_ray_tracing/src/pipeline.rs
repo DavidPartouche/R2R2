@@ -2,13 +2,13 @@ use std::ffi::CStr;
 use std::rc::Rc;
 
 use ash::vk;
+use vulkan_bootstrap::device::VulkanDevice;
+use vulkan_bootstrap::errors::VulkanError;
+use vulkan_bootstrap::shader_module::ShaderModule;
+use vulkan_bootstrap::vulkan_context::VulkanContext;
 
 use crate::descriptor_set::DescriptorSet;
-use crate::device::VulkanDevice;
-use crate::errors::VulkanError;
 use crate::ray_tracing::RayTracing;
-use crate::shader_module::ShaderModule;
-use crate::vulkan_context::VulkanContext;
 
 pub struct Pipeline {
     device: Rc<VulkanDevice>,
@@ -117,7 +117,7 @@ impl<'a> PipelineBuilder<'a> {
 
         let pipeline_layout = self
             .context
-            .device
+            .get_device()
             .create_pipeline_layout(&pipeline_layout_info)?;
 
         let pipeline_info = vk::RayTracingPipelineCreateInfoNV::builder()
@@ -132,7 +132,7 @@ impl<'a> PipelineBuilder<'a> {
             .create_ray_tracing_pipelines(&[pipeline_info])?[0];
 
         Ok(Pipeline {
-            device: Rc::clone(&self.context.device),
+            device: Rc::clone(&self.context.get_device()),
             pipeline_layout,
             pipeline,
             ray_gen_index,

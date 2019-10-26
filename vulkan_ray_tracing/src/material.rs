@@ -1,4 +1,4 @@
-use crate::glm;
+use nalgebra_glm as glm;
 
 #[repr(C)]
 pub struct Material {

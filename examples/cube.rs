@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use r2r2::application::ApplicationBuilder;
-use vulkan_helpers::glm;
+use vulkan_ray_tracing::glm;
 
 fn main() {
     let mut app = ApplicationBuilder::new().build();

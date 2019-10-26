@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
 use ash::vk;
+use vulkan_bootstrap::device::VulkanDevice;
+use vulkan_bootstrap::errors::VulkanError;
+use vulkan_bootstrap::vulkan_context::VulkanContext;
 
-use crate::device::VulkanDevice;
-use crate::errors::VulkanError;
 use crate::geometry_instance::GeometryInstance;
-use crate::vulkan_context::VulkanContext;
 
 pub struct DescriptorSet {
     device: Rc<VulkanDevice>,
@@ -165,14 +165,12 @@ impl<'a> DescriptorSetBuilder<'a> {
     }
 
     pub fn build(self) -> Result<DescriptorSet, VulkanError> {
-        let command_buffer = self.context.command_buffers.begin_single_time_commands(0)?;
+        let command_buffer = self.context.begin_single_time_commands()?;
 
         self.cmd_pipeline_barrier(command_buffer, self.geometry_instance.vertex_buffer.get());
         self.cmd_pipeline_barrier(command_buffer, self.geometry_instance.index_buffer.get());
 
-        self.context
-            .command_buffers
-            .end_single_time_commands(command_buffer, 0)?;
+        self.context.end_single_time_commands(command_buffer)?;
 
         let mut bindings = vec![];
         bindings.push(self.add_binding(
@@ -223,7 +221,7 @@ impl<'a> DescriptorSetBuilder<'a> {
         let descriptor_set = self.generate_set(descriptor_pool, descriptor_set_layout)?;
 
         Ok(DescriptorSet {
-            device: Rc::clone(&self.context.device),
+            device: Rc::clone(&self.context.get_device()),
             descriptor_pool,
             descriptor_set_layout,
             descriptor_set,
@@ -241,7 +239,7 @@ impl<'a> DescriptorSetBuilder<'a> {
             .buffer(buffer)
             .build();
 
-        self.context.device.cmd_pipeline_barrier(
+        self.context.get_device().cmd_pipeline_barrier(
             command_buffer,
             vk::PipelineStageFlags::ALL_COMMANDS,
             vk::PipelineStageFlags::ALL_COMMANDS,
@@ -286,7 +284,7 @@ impl<'a> DescriptorSetBuilder<'a> {
             .max_sets(1)
             .build();
 
-        self.context.device.create_descriptor_pool(&pool_info)
+        self.context.get_device().create_descriptor_pool(&pool_info)
     }
 
     fn generate_layout(
@@ -297,7 +295,7 @@ impl<'a> DescriptorSetBuilder<'a> {
             .bindings(bindings)
             .build();
         self.context
-            .device
+            .get_device()
             .create_descriptor_set_layout(&layout_info)
     }
 
@@ -312,7 +310,7 @@ impl<'a> DescriptorSetBuilder<'a> {
             .build();
 
         self.context
-            .device
+            .get_device()
             .allocate_descriptor_sets(&alloc_info)
             .map(|set| set[0])
     }

@@ -3,13 +3,13 @@ use std::rc::Rc;
 use std::{mem, ptr};
 
 use ash::vk;
+use nalgebra_glm as glm;
+use vulkan_bootstrap::buffer::{Buffer, BufferBuilder, BufferType};
+use vulkan_bootstrap::errors::VulkanError;
+use vulkan_bootstrap::vulkan_context::VulkanContext;
 
 use crate::bottom_level_acceleration_structure::BottomLevelAccelerationStructure;
-use crate::buffer::{Buffer, BufferBuilder, BufferType};
-use crate::errors::VulkanError;
-use crate::glm;
 use crate::ray_tracing::RayTracing;
-use crate::vulkan_context::VulkanContext;
 
 pub struct Instance {
     pub bottom_level_as: vk::AccelerationStructureNV,
@@ -283,7 +283,7 @@ impl<'a> AccelerationStructureBuilder<'a> {
             )
             .build();
 
-        self.context.device.cmd_pipeline_barrier(
+        self.context.get_device().cmd_pipeline_barrier(
             self.command_buffer.unwrap(),
             vk::PipelineStageFlags::ACCELERATION_STRUCTURE_BUILD_NV,
             vk::PipelineStageFlags::ACCELERATION_STRUCTURE_BUILD_NV,
