@@ -7,7 +7,6 @@ use ash::vk;
 use nalgebra_glm as glm;
 use vulkan_bootstrap::buffer::{Buffer, BufferBuilder, BufferType};
 use vulkan_bootstrap::errors::VulkanError;
-use vulkan_bootstrap::image::Image;
 use vulkan_bootstrap::shader_module::ShaderModuleBuilder;
 use vulkan_bootstrap::vulkan_context::VulkanContext;
 
@@ -18,10 +17,7 @@ use crate::bottom_level_acceleration_structure::{
     BottomLevelAccelerationStructure, BottomLevelAccelerationStructureBuilder,
 };
 use crate::descriptor_set::{DescriptorSet, DescriptorSetBuilder};
-use crate::geometry_instance::{
-    GeometryInstance, GeometryInstanceBuilder, UniformBufferObject, Vertex,
-};
-use crate::material::Material;
+use crate::geometry_instance::{GeometryInstance, UniformBufferObject, Vertex};
 use crate::pipeline::{Pipeline, PipelineBuilder};
 use crate::ray_tracing::{RayTracing, RayTracingBuilder};
 use crate::shader_binding_table::{ShaderBindingTable, ShaderBindingTableBuilder};
@@ -171,44 +167,23 @@ impl RayTracingPipeline {
 
 pub struct RayTracingPipelineBuilder<'a> {
     context: &'a VulkanContext,
-    vertices: Vec<Vertex>,
-    indices: Vec<u32>,
-    materials: Vec<Material>,
-    textures: Vec<Image>,
+    geometry_instance: Option<GeometryInstance>,
 }
 
 impl<'a> RayTracingPipelineBuilder<'a> {
     pub fn new(context: &'a VulkanContext) -> Self {
         RayTracingPipelineBuilder {
             context,
-            vertices: vec![],
-            indices: vec![],
-            materials: vec![],
-            textures: vec![],
+            geometry_instance: None,
         }
     }
 
-    pub fn with_vertices(mut self, vertices: &mut Vec<Vertex>) -> Self {
-        self.vertices.append(vertices);
+    pub fn with_geometry_instance(mut self, geometry_instance: GeometryInstance) -> Self {
+        self.geometry_instance = Some(geometry_instance);
         self
     }
 
-    pub fn with_indices(mut self, indices: &mut Vec<u32>) -> Self {
-        self.indices.append(indices);
-        self
-    }
-
-    pub fn with_materials(mut self, materials: &mut Vec<Material>) -> Self {
-        self.materials.append(materials);
-        self
-    }
-
-    pub fn with_textures(mut self, textures: &mut Vec<Image>) -> Self {
-        self.textures.append(textures);
-        self
-    }
-
-    pub fn build(mut self) -> Result<RayTracingPipeline, VulkanError> {
+    pub fn build(self) -> Result<RayTracingPipeline, VulkanError> {
         let ray_tracing = Rc::new(RayTracingBuilder::new(&self.context).build()?);
 
         let camera_buffer = BufferBuilder::new(&self.context)
@@ -216,12 +191,7 @@ impl<'a> RayTracingPipelineBuilder<'a> {
             .with_size(mem::size_of::<UniformBufferObject>() as u64)
             .build()?;
 
-        let geometry_instance = GeometryInstanceBuilder::new(&self.context)
-            .with_vertices(&mut self.vertices)
-            .with_indices(&mut self.indices)
-            .with_materials(&mut self.materials)
-            .with_textures(&mut self.textures)
-            .build()?;
+        let geometry_instance = self.geometry_instance.as_ref().unwrap();
 
         let (bottom_level_as, top_level_as) =
             self.create_acceleration_structures(Rc::clone(&ray_tracing), &geometry_instance)?;
@@ -235,7 +205,7 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         Ok(RayTracingPipeline {
             ray_tracing,
             camera_buffer,
-            geometry_instance,
+            geometry_instance: self.geometry_instance.unwrap(),
             _bottom_level_as: bottom_level_as,
             top_level_as,
             descriptor_set,

@@ -1,16 +1,13 @@
 use std::path::Path;
 
-use vulkan_bootstrap::image::Image;
-
-use vulkan_ray_tracing::geometry_instance::Vertex;
+use vulkan_ray_tracing::geometry_instance::{ImageBuffer, Material, Vertex};
 use vulkan_ray_tracing::glm;
-use vulkan_ray_tracing::material::Material;
 
 pub struct Model {
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
     pub materials: Vec<Material>,
-    pub textures: Vec<Image>,
+    pub textures: Vec<ImageBuffer>,
 }
 
 impl Model {
@@ -64,6 +61,7 @@ impl Model {
                         model.mesh.normals[3 * v + 1],
                         model.mesh.normals[3 * v + 2],
                     ),
+                    color: glm::vec3(1.0, 1.0, 1.0),
                     tex_coord: glm::vec2(
                         model.mesh.texcoords[2 * v],
                         1.0 - model.mesh.texcoords[2 * v + 1],
@@ -83,13 +81,13 @@ impl Model {
         }
     }
 
-    fn load_texture(filename: &str) -> Image {
+    fn load_texture(filename: &str) -> ImageBuffer {
         let path = Path::new(filename);
         let image = image::open(path).unwrap().to_rgba();
         let width = image.width();
         let height = image.height();
 
-        Image {
+        ImageBuffer {
             pixels: image.into_raw(),
             tex_width: width,
             tex_height: height,

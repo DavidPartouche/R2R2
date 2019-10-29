@@ -2,6 +2,14 @@ use std::path::Path;
 use std::process::Command;
 
 fn main() {
+    let vert_input = Path::new("assets/shaders/vert_shader.vert");
+    let vert_output = Path::new("assets/shaders/vert_shader.spv");
+    compile_shader(vert_input, vert_output);
+
+    let frag_input = Path::new("assets/shaders/frag_shader.frag");
+    let frag_output = Path::new("assets/shaders/frag_shader.spv");
+    compile_shader(frag_input, frag_output);
+
     let closesthit_input = Path::new("assets/shaders/closesthit.rchit");
     let closesthit_output = Path::new("assets/shaders/closesthit.spv");
     compile_shader(closesthit_input, closesthit_output);

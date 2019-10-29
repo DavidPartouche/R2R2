@@ -4,17 +4,20 @@ use std::ptr::null;
 
 use vulkan_bootstrap::debug::{DebugOptions, DebugSeverity, DebugType};
 use vulkan_bootstrap::extensions::DeviceExtensions;
+use vulkan_bootstrap::features::Features;
 use vulkan_bootstrap::vulkan_context::{VulkanContext, VulkanContextBuilder};
 use vulkan_bootstrap::windows::Win32Window;
 
+use vulkan_ray_tracing::geometry_instance::GeometryInstanceBuilder;
 use vulkan_ray_tracing::glm;
+use vulkan_ray_tracing::graphics_pipeline::{GraphicsPipeline, GraphicsPipelineBuilder};
 use vulkan_ray_tracing::ray_tracing_pipeline::{RayTracingPipeline, RayTracingPipelineBuilder};
 
 use crate::model::Model;
 
 pub struct Renderer {
     context: VulkanContext,
-    pipeline: Option<RayTracingPipeline>,
+    pipeline: Option<GraphicsPipeline>,
     width: u32,
     height: u32,
 }
@@ -29,7 +32,12 @@ impl Renderer {
 
         let debug_options = if debug {
             DebugOptions {
-                debug_severity: DebugSeverity::all(),
+                debug_severity: DebugSeverity {
+                    warning: true,
+                    error: true,
+                    info: false,
+                    verbose: false,
+                },
                 debug_type: DebugType::all(),
             }
         } else {
@@ -50,6 +58,7 @@ impl Renderer {
             .with_debug_options(debug_options)
             .with_window(window)
             .with_extensions(extensions)
+            .with_features(Features::all())
             .with_frames_count(2)
             .build()
             .unwrap();
@@ -69,7 +78,7 @@ impl Renderer {
     pub fn load_model(&mut self, filename: &Path) {
         let mut model = Model::new(filename);
 
-        let ray_tracing_pipeline = RayTracingPipelineBuilder::new(&self.context)
+        let geom = GeometryInstanceBuilder::new(&self.context)
             .with_vertices(&mut model.vertices)
             .with_indices(&mut model.indices)
             .with_materials(&mut model.materials)
@@ -77,7 +86,21 @@ impl Renderer {
             .build()
             .unwrap();
 
-        self.pipeline = Some(ray_tracing_pipeline);
+        //        let ray_tracing_pipeline = RayTracingPipelineBuilder::new(&self.context)
+        //            .with_geometry_instance(geom)
+        //            .build()
+        //            .unwrap();
+
+        //        self.pipeline = Some(ray_tracing_pipeline);
+
+        let graphics_pipeline = GraphicsPipelineBuilder::new(&self.context)
+            .with_geometry_instance(geom)
+            .with_width(self.width)
+            .with_height(self.height)
+            .build()
+            .unwrap();
+
+        self.pipeline = Some(graphics_pipeline);
     }
 
     pub fn draw(&mut self) {

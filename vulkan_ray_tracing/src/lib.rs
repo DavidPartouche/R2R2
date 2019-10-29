@@ -1,7 +1,7 @@
 pub use nalgebra_glm as glm;
 
 pub mod geometry_instance;
-pub mod material;
+pub mod graphics_pipeline;
 pub mod ray_tracing_pipeline;
 
 mod acceleration_structure;
