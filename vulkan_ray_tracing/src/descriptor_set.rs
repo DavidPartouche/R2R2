@@ -47,6 +47,7 @@ impl DescriptorSet {
         wds.push(as_wds);
 
         let output_image_info = vk::DescriptorImageInfo::builder()
+            .sampler(vk::Sampler::null())
             .image_layout(vk::ImageLayout::GENERAL)
             .image_view(target)
             .build();

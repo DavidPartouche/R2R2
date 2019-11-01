@@ -23,6 +23,7 @@ pub struct ApplicationBuilder {
     title: String,
     width: u32,
     height: u32,
+    fullscreen: bool,
 }
 
 impl Default for ApplicationBuilder {
@@ -31,6 +32,7 @@ impl Default for ApplicationBuilder {
             title: String::from("R2R2"),
             width: 800,
             height: 600,
+            fullscreen: false,
         }
     }
 }
@@ -55,6 +57,11 @@ impl ApplicationBuilder {
         self
     }
 
+    pub fn with_fullscreen(mut self, fullscreen: bool) -> Self {
+        self.fullscreen = fullscreen;
+        self
+    }
+
     pub fn build(self) -> Application {
         SimpleLogger::init(LevelFilter::Trace, Config::default())
             .expect("Cannot create the logger!");
@@ -62,7 +69,8 @@ impl ApplicationBuilder {
         let window =
             Window::new(&self.title, self.width, self.height).expect("Cannot create a window!");
 
-        let renderer = Renderer::new(true, window.hwnd(), self.width, self.height);
+        let size = window.size();
+        let renderer = Renderer::new(true, window.hwnd(), size.width, size.height);
 
         Application {
             window: Some(window),

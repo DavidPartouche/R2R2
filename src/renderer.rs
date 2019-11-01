@@ -10,14 +10,13 @@ use vulkan_bootstrap::windows::Win32Window;
 
 use vulkan_ray_tracing::geometry_instance::GeometryInstanceBuilder;
 use vulkan_ray_tracing::glm;
-use vulkan_ray_tracing::graphics_pipeline::{GraphicsPipeline, GraphicsPipelineBuilder};
 use vulkan_ray_tracing::ray_tracing_pipeline::{RayTracingPipeline, RayTracingPipelineBuilder};
 
 use crate::model::Model;
 
 pub struct Renderer {
     context: VulkanContext,
-    pipeline: Option<GraphicsPipeline>,
+    pipeline: Option<RayTracingPipeline>,
     width: u32,
     height: u32,
 }
@@ -86,21 +85,11 @@ impl Renderer {
             .build()
             .unwrap();
 
-        //        let ray_tracing_pipeline = RayTracingPipelineBuilder::new(&self.context)
-        //            .with_geometry_instance(geom)
-        //            .build()
-        //            .unwrap();
-
-        //        self.pipeline = Some(ray_tracing_pipeline);
-
-        let graphics_pipeline = GraphicsPipelineBuilder::new(&self.context)
+        let ray_tracing_pipeline = RayTracingPipelineBuilder::new(&self.context)
             .with_geometry_instance(geom)
-            .with_width(self.width)
-            .with_height(self.height)
             .build()
             .unwrap();
-
-        self.pipeline = Some(graphics_pipeline);
+        self.pipeline = Some(ray_tracing_pipeline);
     }
 
     pub fn draw(&mut self) {

@@ -92,6 +92,7 @@ impl RayTracingPipeline {
         context.get_device().cmd_bind_descriptor_sets(
             command_buffer,
             self.pipeline.get_layout(),
+            vk::PipelineBindPoint::RAY_TRACING_NV,
             &[self.descriptor_set.get()],
         );
 
