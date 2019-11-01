@@ -64,16 +64,14 @@ impl RayTracingPipeline {
 
     pub fn draw(&mut self, context: &mut VulkanContext) -> Result<(), VulkanError> {
         context.frame_begin()?;
-        let command_buffer = context.get_current_command_buffer();
 
         self.create_image_barrier(
             context,
-            command_buffer,
             vk::AccessFlags::empty(),
             vk::AccessFlags::TRANSFER_WRITE,
             vk::ImageLayout::UNDEFINED,
-            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-        );
+            vk::ImageLayout::GENERAL,
+        )?;
 
         self.descriptor_set.update_render_target(
             self.top_level_as.get(),
@@ -82,6 +80,7 @@ impl RayTracingPipeline {
             &self.geometry_instance,
         );
 
+        let command_buffer = context.get_current_command_buffer();
         context.begin_render_pass();
         context.get_device().cmd_bind_pipeline(
             command_buffer,
@@ -113,12 +112,11 @@ impl RayTracingPipeline {
 
         self.create_image_barrier(
             context,
-            command_buffer,
             vk::AccessFlags::TRANSFER_WRITE,
             vk::AccessFlags::empty(),
             vk::ImageLayout::GENERAL,
             vk::ImageLayout::PRESENT_SRC_KHR,
-        );
+        )?;
 
         context.get_device().cmd_next_subpass(command_buffer);
         context.end_render_pass();
@@ -129,12 +127,12 @@ impl RayTracingPipeline {
     fn create_image_barrier(
         &self,
         context: &VulkanContext,
-        command_buffer: vk::CommandBuffer,
         src_access_mask: vk::AccessFlags,
         dst_access_mask: vk::AccessFlags,
         old_layout: vk::ImageLayout,
         new_layout: vk::ImageLayout,
-    ) {
+    ) -> Result<(), VulkanError> {
+        let command_buffer = context.begin_single_time_commands()?;
         let subresource_range = vk::ImageSubresourceRange::builder()
             .aspect_mask(vk::ImageAspectFlags::COLOR)
             .base_mip_level(0)
@@ -163,6 +161,7 @@ impl RayTracingPipeline {
             &[],
             &[image_memory_barrier],
         );
+        context.end_single_time_commands(command_buffer)
     }
 }
 

@@ -23,7 +23,6 @@ pub struct ApplicationBuilder {
     title: String,
     width: u32,
     height: u32,
-    fullscreen: bool,
 }
 
 impl Default for ApplicationBuilder {
@@ -32,7 +31,6 @@ impl Default for ApplicationBuilder {
             title: String::from("R2R2"),
             width: 800,
             height: 600,
-            fullscreen: false,
         }
     }
 }
@@ -54,11 +52,6 @@ impl ApplicationBuilder {
 
     pub fn with_height(mut self, height: u32) -> Self {
         self.height = height;
-        self
-    }
-
-    pub fn with_fullscreen(mut self, fullscreen: bool) -> Self {
-        self.fullscreen = fullscreen;
         self
     }
 
