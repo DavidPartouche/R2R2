@@ -45,11 +45,25 @@ impl Model {
         }
 
         for model in models.iter() {
-            indices.reserve(model.mesh.indices.len());
-            indices.extend(model.mesh.indices.iter());
-            vertices.reserve(model.mesh.positions.len() / 3);
+            let current_indices: Vec<u32> = model
+                .mesh
+                .indices
+                .iter()
+                .map(|x| x + vertices.len() as u32)
+                .collect();
+            indices.extend_from_slice(&current_indices);
 
+            vertices.reserve(model.mesh.positions.len() / 3);
             for v in 0..model.mesh.positions.len() / 3 {
+                let tex_coord = if model.mesh.texcoords.is_empty() {
+                    glm::vec2(0.0, 1.0)
+                } else {
+                    glm::vec2(
+                        model.mesh.texcoords[2 * v],
+                        1.0 - model.mesh.texcoords[2 * v + 1],
+                    )
+                };
+
                 let vertex = Vertex {
                     pos: glm::vec3(
                         model.mesh.positions[3 * v],
@@ -62,10 +76,7 @@ impl Model {
                         model.mesh.normals[3 * v + 2],
                     ),
                     color: glm::vec3(1.0, 1.0, 1.0),
-                    tex_coord: glm::vec2(
-                        model.mesh.texcoords[2 * v],
-                        1.0 - model.mesh.texcoords[2 * v + 1],
-                    ),
+                    tex_coord,
                     mat_id: model.mesh.material_id.unwrap_or(0) as i32,
                 };
 
@@ -82,7 +93,7 @@ impl Model {
     }
 
     fn load_texture(filename: &str) -> ImageBuffer {
-        let path = Path::new(filename);
+        let path = Path::new("assets/textures/").join(filename);
         let image = image::open(path).unwrap().to_rgba();
         let width = image.width();
         let height = image.height();

@@ -79,7 +79,7 @@ pub struct UniformBufferObject {
     pub proj_inverse: glm::Mat4,
 }
 
-#[repr(C)]
+#[repr(C, packed)]
 pub struct Material {
     pub ambient: glm::Vec3,
     pub diffuse: glm::Vec3,
