@@ -259,6 +259,7 @@ impl<'a> RayTracingPipelineBuilder<'a> {
             .with_index_buffer(geom.index_buffer.get())
             .with_index_offset(geom.index_offset)
             .with_index_count(geom.index_count)
+            .with_opaque(true)
             .build()
     }
 

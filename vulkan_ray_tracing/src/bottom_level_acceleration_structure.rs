@@ -68,6 +68,11 @@ impl BottomLevelAccelerationStructureBuilder {
         self
     }
 
+    pub fn with_opaque(mut self, opaque: bool) -> Self {
+        self.opaque = opaque;
+        self
+    }
+
     pub fn build(self) -> BottomLevelAccelerationStructure {
         let triangles = vk::GeometryTrianglesNV::builder()
             .vertex_data(self.vertex_buffer.unwrap())

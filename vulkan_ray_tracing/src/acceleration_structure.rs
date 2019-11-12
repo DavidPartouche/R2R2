@@ -1,6 +1,6 @@
+use std::mem;
 use std::os::raw::c_void;
 use std::rc::Rc;
-use std::{mem, ptr};
 
 use ash::vk;
 use nalgebra_glm as glm;
@@ -10,6 +10,7 @@ use vulkan_bootstrap::vulkan_context::VulkanContext;
 
 use crate::bottom_level_acceleration_structure::BottomLevelAccelerationStructure;
 use crate::ray_tracing::RayTracing;
+use std::convert::TryInto;
 
 pub struct Instance {
     pub bottom_level_as: vk::AccelerationStructureNV,
@@ -18,15 +19,55 @@ pub struct Instance {
     pub hit_group_index: u32,
 }
 
-// TODO: Change some values to u24
 #[repr(C, packed)]
 struct VulkanGeometryInstance {
     transform: [f32; 12],
-    instance_id: u32,
-    mask: u8,
-    instance_offset: u32,
-    flags: u32,
-    acceleration_structure_handle: u64,
+    instance_id_and_mask: u32,
+    instance_offset_and_flags: u32,
+    acceleration_handle: u64,
+}
+
+impl VulkanGeometryInstance {
+    pub fn new(
+        transform: [f32; 12],
+        id: u32,
+        mask: u8,
+        offset: u32,
+        flags: vk::GeometryInstanceFlagsNV,
+        acceleration_handle: u64,
+    ) -> Self {
+        let mut instance = VulkanGeometryInstance {
+            transform,
+            instance_id_and_mask: 0,
+            instance_offset_and_flags: 0,
+            acceleration_handle,
+        };
+        instance.set_id(id);
+        instance.set_mask(mask);
+        instance.set_offset(offset);
+        instance.set_flags(flags);
+        instance
+    }
+
+    fn set_id(&mut self, id: u32) {
+        let id = id & 0x00ff_ffff;
+        self.instance_id_and_mask |= id;
+    }
+
+    fn set_mask(&mut self, mask: u8) {
+        let mask = u32::from(mask);
+        self.instance_id_and_mask |= mask << 24;
+    }
+
+    fn set_offset(&mut self, offset: u32) {
+        let offset = offset & 0x00ff_ffff;
+        self.instance_offset_and_flags |= offset;
+    }
+
+    fn set_flags(&mut self, flags: vk::GeometryInstanceFlagsNV) {
+        let flags = flags.as_raw() as u32;
+        self.instance_offset_and_flags |= flags << 24;
+    }
 }
 
 pub struct AccelerationStructure {
@@ -211,20 +252,15 @@ impl<'a> AccelerationStructureBuilder<'a> {
                     .ray_tracing
                     .get_acceleration_structure_handle(tlas.bottom_level_as)?;
 
-                let mut g_inst = VulkanGeometryInstance {
-                    transform: [0.0; 12],
-                    instance_id: tlas.instance_id,
-                    mask: std::u8::MAX,
-                    instance_offset: tlas.hit_group_index,
-                    flags: vk::GeometryInstanceFlagsNV::TRIANGLE_CULL_DISABLE.as_raw(),
-                    acceleration_structure_handle: handle,
-                };
-
-                let src = glm::transpose(&tlas.transform).as_ptr() as *const f32;
-                unsafe {
-                    let dst = g_inst.transform.as_mut_ptr();
-                    ptr::copy(src, dst, mem::size_of::<[f32; 12]>());
-                }
+                let transform = &tlas.transform.as_slice()[0..12];
+                let g_inst = VulkanGeometryInstance::new(
+                    transform.try_into().unwrap(),
+                    tlas.instance_id,
+                    std::u8::MAX,
+                    tlas.hit_group_index,
+                    vk::GeometryInstanceFlagsNV::TRIANGLE_CULL_DISABLE,
+                    handle,
+                );
 
                 geometry_instances.push(g_inst);
             }
