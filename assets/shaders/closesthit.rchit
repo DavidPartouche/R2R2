@@ -3,8 +3,10 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 
 layout(location = 0) rayPayloadInNV vec3 hitValue;
-hitAttributeNV vec3 attribs;
+layout(location = 2) rayPayloadNV bool isShadowed;
 
+hitAttributeNV vec3 attribs;
+layout(binding = 0, set = 0) uniform accelerationStructureNV topLevelAS;
 layout(binding = 3, set = 0) buffer Vertices { vec4 v[]; }
 vertices;
 layout(binding = 4, set = 0) buffer Indices { uint i[]; }
@@ -95,5 +97,16 @@ void main()
         c *= texture(textureSamplers[mat.textureId], texCoord).xyz;
     }
 
-    hitValue = c;
+    float tmin = 0.001;
+    float tmax = 100.0;
+    vec3 origin = gl_WorldRayOriginNV + gl_WorldRayDirectionNV * gl_HitTNV;
+    isShadowed = true;
+    traceNV(topLevelAS, gl_RayFlagsTerminateOnFirstHitNV|gl_RayFlagsOpaqueNV|gl_RayFlagsSkipClosestHitShaderNV, 0xFF, 1, 0, 1, origin, tmin, lightVector, tmax, 2);
+
+    if (isShadowed) {
+        hitValue = c * 0.3;
+    }
+    else {
+        hitValue = c;
+    }
 }

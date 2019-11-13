@@ -178,7 +178,7 @@ impl<'a> DescriptorSetBuilder<'a> {
             0,
             1,
             vk::DescriptorType::ACCELERATION_STRUCTURE_NV,
-            vk::ShaderStageFlags::RAYGEN_NV,
+            vk::ShaderStageFlags::RAYGEN_NV | vk::ShaderStageFlags::CLOSEST_HIT_NV,
         ));
         bindings.push(self.add_binding(
             1,

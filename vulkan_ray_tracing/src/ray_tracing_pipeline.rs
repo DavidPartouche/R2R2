@@ -235,7 +235,7 @@ impl<'a> RayTracingPipelineBuilder<'a> {
                 bottom_level_as: blas.get(),
                 transform: geometry_instance.transform,
                 instance_id: index as u32,
-                hit_group_index: index as u32,
+                hit_group_index: (index * 2) as u32,
             })
             .collect();
 
@@ -281,6 +281,9 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         let miss_module = ShaderModuleBuilder::new(Rc::clone(&self.context.get_device()))
             .with_path(Path::new("assets/shaders/miss.spv"))
             .build()?;
+        let shadow_miss_module = ShaderModuleBuilder::new(Rc::clone(&self.context.get_device()))
+            .with_path(Path::new("assets/shaders/shadow_miss.spv"))
+            .build()?;
         let closest_hit_module = ShaderModuleBuilder::new(Rc::clone(&self.context.get_device()))
             .with_path(Path::new("assets/shaders/closesthit.spv"))
             .build()?;
@@ -288,8 +291,9 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         PipelineBuilder::new(&self.context, ray_tracing, descriptor_set)
             .with_ray_gen_shader(ray_gen_module)
             .with_miss_shader(miss_module)
-            .with_closest_hit_shader(closest_hit_module)
-            .with_max_recursion_depth(1)
+            .with_shadow_miss_shader(shadow_miss_module)
+            .with_hit_shader(closest_hit_module)
+            .with_max_recursion_depth(2)
             .build()
     }
 

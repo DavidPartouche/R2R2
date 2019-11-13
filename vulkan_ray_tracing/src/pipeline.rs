@@ -16,7 +16,9 @@ pub struct Pipeline {
     pipeline: vk::Pipeline,
     pub ray_gen_index: u32,
     pub miss_index: u32,
+    pub shadow_miss_index: u32,
     pub hit_group_index: u32,
+    pub shadow_hit_group_index: u32,
 }
 
 impl Pipeline {
@@ -42,7 +44,8 @@ pub struct PipelineBuilder<'a> {
     descriptor_set: &'a DescriptorSet,
     ray_gen_shader: Option<ShaderModule>,
     miss_shader: Option<ShaderModule>,
-    closest_hit_shader: Option<ShaderModule>,
+    shadow_miss_shader: Option<ShaderModule>,
+    hit_shader: Option<ShaderModule>,
     max_recursion_depth: u32,
 }
 
@@ -58,7 +61,8 @@ impl<'a> PipelineBuilder<'a> {
             descriptor_set,
             ray_gen_shader: None,
             miss_shader: None,
-            closest_hit_shader: None,
+            shadow_miss_shader: None,
+            hit_shader: None,
             max_recursion_depth: 0,
         }
     }
@@ -73,8 +77,13 @@ impl<'a> PipelineBuilder<'a> {
         self
     }
 
-    pub fn with_closest_hit_shader(mut self, closest_hit_shader: ShaderModule) -> Self {
-        self.closest_hit_shader = Some(closest_hit_shader);
+    pub fn with_shadow_miss_shader(mut self, shadow_miss_shader: ShaderModule) -> Self {
+        self.shadow_miss_shader = Some(shadow_miss_shader);
+        self
+    }
+
+    pub fn with_hit_shader(mut self, hit_shader: ShaderModule) -> Self {
+        self.hit_shader = Some(hit_shader);
         self
     }
 
@@ -87,29 +96,40 @@ impl<'a> PipelineBuilder<'a> {
         let mut shader_stages = vec![];
         let mut shader_groups = vec![];
 
-        let ray_gen_index = 0;
-        let (shader_stage, shader_group) = self.add_shader_stage(
-            self.ray_gen_shader.as_ref().unwrap(),
+        let ray_gen_index = self.add_shader_stage(
+            self.ray_gen_shader.as_ref(),
             vk::ShaderStageFlags::RAYGEN_NV,
-            ray_gen_index,
+            &mut shader_stages,
+            &mut shader_groups,
         );
-        shader_stages.push(shader_stage);
-        shader_groups.push(shader_group);
 
-        let miss_index = 1;
-        let (shader_stage, shader_group) = self.add_shader_stage(
-            self.miss_shader.as_ref().unwrap(),
+        let miss_index = self.add_shader_stage(
+            self.miss_shader.as_ref(),
             vk::ShaderStageFlags::MISS_NV,
-            miss_index,
+            &mut shader_stages,
+            &mut shader_groups,
         );
-        shader_stages.push(shader_stage);
-        shader_groups.push(shader_group);
 
-        let hit_group_index = 2;
-        let (shader_stage, shader_group) =
-            self.add_closest_hit_shader(self.closest_hit_shader.as_ref().unwrap(), hit_group_index);
-        shader_stages.push(shader_stage);
-        shader_groups.push(shader_group);
+        let shadow_miss_index = self.add_shader_stage(
+            self.shadow_miss_shader.as_ref(),
+            vk::ShaderStageFlags::MISS_NV,
+            &mut shader_stages,
+            &mut shader_groups,
+        );
+
+        let hit_group_index = self.add_shader_stage(
+            self.hit_shader.as_ref(),
+            vk::ShaderStageFlags::CLOSEST_HIT_NV,
+            &mut shader_stages,
+            &mut shader_groups,
+        );
+
+        let shadow_hit_group_index = self.add_shader_stage(
+            None,
+            vk::ShaderStageFlags::empty(),
+            &mut shader_stages,
+            &mut shader_groups,
+        );
 
         let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
             .set_layouts(&[self.descriptor_set.get_layout()])
@@ -137,56 +157,57 @@ impl<'a> PipelineBuilder<'a> {
             pipeline,
             ray_gen_index,
             miss_index,
+            shadow_miss_index,
             hit_group_index,
+            shadow_hit_group_index,
         })
     }
 
     fn add_shader_stage(
         &self,
-        shader: &ShaderModule,
+        shader: Option<&ShaderModule>,
         stage: vk::ShaderStageFlags,
-        index: u32,
-    ) -> (
-        vk::PipelineShaderStageCreateInfo,
-        vk::RayTracingShaderGroupCreateInfoNV,
-    ) {
-        let stage_create = vk::PipelineShaderStageCreateInfo::builder()
-            .stage(stage)
-            .module(shader.get())
-            .name(CStr::from_bytes_with_nul(b"main\0").unwrap())
-            .build();
-        let group_info = vk::RayTracingShaderGroupCreateInfoNV::builder()
-            .ty(vk::RayTracingShaderGroupTypeNV::GENERAL)
-            .general_shader(index)
-            .closest_hit_shader(vk::SHADER_UNUSED_NV)
-            .any_hit_shader(vk::SHADER_UNUSED_NV)
-            .intersection_shader(vk::SHADER_UNUSED_NV)
-            .build();
-        (stage_create, group_info)
-    }
+        shader_stages: &mut Vec<vk::PipelineShaderStageCreateInfo>,
+        shader_groups: &mut Vec<vk::RayTracingShaderGroupCreateInfoNV>,
+    ) -> u32 {
+        let index = shader_stages.len() as u32;
 
-    fn add_closest_hit_shader(
-        &self,
-        shader: &ShaderModule,
-        index: u32,
-    ) -> (
-        vk::PipelineShaderStageCreateInfo,
-        vk::RayTracingShaderGroupCreateInfoNV,
-    ) {
-        let stage_create = vk::PipelineShaderStageCreateInfo::builder()
-            .stage(vk::ShaderStageFlags::CLOSEST_HIT_NV)
-            .module(shader.get())
-            .name(CStr::from_bytes_with_nul(b"main\0").unwrap())
-            .build();
-
-        let group_info = vk::RayTracingShaderGroupCreateInfoNV::builder()
+        let mut group_info = vk::RayTracingShaderGroupCreateInfoNV::builder()
             .ty(vk::RayTracingShaderGroupTypeNV::TRIANGLES_HIT_GROUP)
             .general_shader(vk::SHADER_UNUSED_NV)
-            .closest_hit_shader(index)
+            .closest_hit_shader(vk::SHADER_UNUSED_NV)
             .any_hit_shader(vk::SHADER_UNUSED_NV)
-            .intersection_shader(vk::SHADER_UNUSED_NV)
-            .build();
+            .intersection_shader(vk::SHADER_UNUSED_NV);
 
-        (stage_create, group_info)
+        if let Some(shader) = shader {
+            let stage_create = vk::PipelineShaderStageCreateInfo::builder()
+                .stage(stage)
+                .module(shader.get())
+                .name(CStr::from_bytes_with_nul(b"main\0").unwrap())
+                .build();
+            shader_stages.push(stage_create);
+
+            match stage {
+                vk::ShaderStageFlags::ANY_HIT_NV => {
+                    group_info = group_info.any_hit_shader(index);
+                }
+                vk::ShaderStageFlags::CLOSEST_HIT_NV => {
+                    group_info = group_info.closest_hit_shader(index);
+                }
+                vk::ShaderStageFlags::INTERSECTION_NV => {
+                    group_info = group_info.intersection_shader(index);
+                }
+                _ => {
+                    group_info = group_info
+                        .ty(vk::RayTracingShaderGroupTypeNV::GENERAL)
+                        .general_shader(index);
+                }
+            }
+        }
+
+        let group_info = group_info.build();
+        shader_groups.push(group_info);
+
+        index
     }
 }

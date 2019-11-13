@@ -1,5 +1,4 @@
 use std::os::raw::c_void;
-use std::ptr;
 
 use ash::vk;
 use vulkan_bootstrap::buffer::{Buffer, BufferBuilder, BufferType};
@@ -45,22 +44,31 @@ impl<'a> ShaderBindingTableBuilder<'a> {
     }
 
     pub fn build(self) -> Result<ShaderBindingTable, VulkanError> {
-        let prog_id_size = self.ray_tracing.get_properties().shader_group_handle_size;
+        let ray_gen = vec![self.pipeline.ray_gen_index];
+        let miss = vec![self.pipeline.miss_index, self.pipeline.shadow_miss_index];
+        let hit_group = vec![
+            self.pipeline.hit_group_index,
+            self.pipeline.shadow_hit_group_index,
+        ];
 
+        let prog_id_size = self.ray_tracing.get_properties().shader_group_handle_size;
         let entry_size = (prog_id_size + (prog_id_size % 16)) as vk::DeviceSize;
+
         let ray_gen_entry_size = entry_size;
         let miss_entry_size = entry_size;
         let hit_group_entry_size = entry_size;
-        let sbt_size = ray_gen_entry_size + miss_entry_size + hit_group_entry_size;
+
+        let sbt_size = ray_gen_entry_size * ray_gen.len() as u64
+            + miss_entry_size * miss.len() as u64
+            + hit_group_entry_size * hit_group.len() as u64;
 
         let sbt_buffer = BufferBuilder::new(self.context)
             .with_type(BufferType::ShaderBindingTable)
             .with_size(sbt_size)
             .build()?;
 
-        let group_count: u32 = 3;
-
-        let mut shader_handle_storage = vec![0; (group_count * prog_id_size) as usize];
+        let group_count = (ray_gen.len() + miss.len() + hit_group.len()) as u32;
+        let mut shader_handle_storage = vec![0u8; (group_count * prog_id_size) as usize];
 
         self.ray_tracing.get_ray_tracing_shader_group_handles(
             self.pipeline.get(),
@@ -74,36 +82,21 @@ impl<'a> ShaderBindingTableBuilder<'a> {
             .get_device()
             .map_memory(sbt_buffer.get_memory(), sbt_size)?;
 
-        self.copy_shader_data(
-            shader_handle_storage.as_ptr() as *const c_void,
-            data,
-            self.pipeline.ray_gen_index,
-            prog_id_size,
-        );
-        let data = unsafe { data.offset(ray_gen_entry_size as isize) };
-
-        self.copy_shader_data(
-            shader_handle_storage.as_ptr() as *const c_void,
-            data,
-            self.pipeline.miss_index,
-            prog_id_size,
-        );
-        let data = unsafe { data.offset(miss_entry_size as isize) };
-
-        self.copy_shader_data(
-            shader_handle_storage.as_ptr() as *const c_void,
-            data,
-            self.pipeline.hit_group_index,
-            prog_id_size,
-        );
+        unsafe {
+            std::ptr::copy(
+                shader_handle_storage.as_ptr() as *const c_void,
+                data,
+                sbt_size as usize,
+            );
+        }
 
         self.context
             .get_device()
             .unmap_memory(sbt_buffer.get_memory());
 
         let ray_gen_offset = 0;
-        let miss_offset = ray_gen_entry_size;
-        let hit_group_offset = ray_gen_entry_size + miss_entry_size;
+        let miss_offset = ray_gen_entry_size * ray_gen.len() as vk::DeviceSize;
+        let hit_group_offset = miss_offset + miss_entry_size * miss.len() as vk::DeviceSize;
 
         Ok(ShaderBindingTable {
             sbt_buffer,
@@ -114,18 +107,5 @@ impl<'a> ShaderBindingTableBuilder<'a> {
             hit_group_entry_size,
             hit_group_offset,
         })
-    }
-
-    fn copy_shader_data(
-        &self,
-        shader_handle_storage: *const c_void,
-        data: *mut c_void,
-        shader_index: u32,
-        prog_id_size: u32,
-    ) {
-        let src = unsafe { shader_handle_storage.offset((shader_index * prog_id_size) as isize) };
-        unsafe {
-            ptr::copy(src, data, prog_id_size as usize);
-        }
     }
 }
