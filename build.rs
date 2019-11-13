@@ -1,23 +1,27 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn main() {
-    let closesthit_input = Path::new("assets/shaders/closesthit.rchit");
-    let closesthit_output = Path::new("assets/shaders/closesthit.spv");
-    compile_shader(closesthit_input, closesthit_output);
+    let shader_files = std::fs::read_dir(Path::new("assets/shaders/")).unwrap();
 
-    let miss_input = Path::new("assets/shaders/miss.rmiss");
-    let miss_output = Path::new("assets/shaders/miss.spv");
-    compile_shader(miss_input, miss_output);
-
-    let raygen_input = Path::new("assets/shaders/raygen.rgen");
-    let raygen_output = Path::new("assets/shaders/raygen.spv");
-    compile_shader(raygen_input, raygen_output);
+    for shader_file in shader_files {
+        let input = shader_file.unwrap().path();
+        if let Some(extension) = input.extension() {
+            if extension.eq("rchit") || extension.eq("rmiss") || extension.eq("rgen") {
+                let output = input.with_extension("spv");
+                compile_shader(&input, &output);
+            }
+        }
+    }
 }
 
-fn compile_shader(input: &Path, output: &Path) {
-    Command::new("glslc")
+fn compile_shader(input: &PathBuf, output: &PathBuf) {
+    let output = Command::new("glslc")
         .args(&[input.to_str().unwrap(), "-o", output.to_str().unwrap()])
-        .status()
-        .unwrap();
+        .output()
+        .expect("Failed to compile shader");
+
+    if !output.status.success() {
+        panic!("{}", std::str::from_utf8(&output.stderr).unwrap());
+    }
 }
