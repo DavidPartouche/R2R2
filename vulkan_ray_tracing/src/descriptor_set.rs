@@ -29,13 +29,13 @@ impl DescriptorSet {
         target: vk::ImageView,
         camera_buffer: vk::Buffer,
         geometry_instance: &GeometryInstance,
+        clear_buffer: vk::Buffer,
     ) {
         let mut wds = vec![];
 
         let mut as_info = vk::WriteDescriptorSetAccelerationStructureNV::builder()
             .acceleration_structures(&[acceleration_structure])
             .build();
-
         let mut as_wds = vk::WriteDescriptorSet::builder()
             .dst_set(self.descriptor_set)
             .dst_array_element(0)
@@ -51,7 +51,6 @@ impl DescriptorSet {
             .image_layout(vk::ImageLayout::GENERAL)
             .image_view(target)
             .build();
-
         let output_image_wds = vk::WriteDescriptorSet::builder()
             .dst_set(self.descriptor_set)
             .dst_array_element(0)
@@ -66,7 +65,6 @@ impl DescriptorSet {
             .offset(0)
             .range(vk::WHOLE_SIZE)
             .build();
-
         let cam_wds = vk::WriteDescriptorSet::builder()
             .dst_set(self.descriptor_set)
             .dst_array_element(0)
@@ -81,7 +79,6 @@ impl DescriptorSet {
             .offset(0)
             .range(vk::WHOLE_SIZE)
             .build();
-
         let vertex_wds = vk::WriteDescriptorSet::builder()
             .dst_set(self.descriptor_set)
             .dst_array_element(0)
@@ -96,7 +93,6 @@ impl DescriptorSet {
             .offset(0)
             .range(vk::WHOLE_SIZE)
             .build();
-
         let index_wds = vk::WriteDescriptorSet::builder()
             .dst_set(self.descriptor_set)
             .dst_array_element(0)
@@ -111,7 +107,6 @@ impl DescriptorSet {
             .offset(0)
             .range(vk::WHOLE_SIZE)
             .build();
-
         let mat_wds = vk::WriteDescriptorSet::builder()
             .dst_set(self.descriptor_set)
             .dst_array_element(0)
@@ -130,7 +125,6 @@ impl DescriptorSet {
                 .build();
             image_infos.push(image_info);
         }
-
         let textures_wds = vk::WriteDescriptorSet::builder()
             .dst_set(self.descriptor_set)
             .dst_array_element(0)
@@ -139,6 +133,20 @@ impl DescriptorSet {
             .image_info(&image_infos)
             .build();
         wds.push(textures_wds);
+
+        let clear_info = vk::DescriptorBufferInfo::builder()
+            .buffer(clear_buffer)
+            .offset(0)
+            .range(vk::WHOLE_SIZE)
+            .build();
+        let clear_wds = vk::WriteDescriptorSet::builder()
+            .dst_set(self.descriptor_set)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .dst_binding(7)
+            .buffer_info(&[clear_info])
+            .build();
+        wds.push(clear_wds);
 
         self.device.update_descriptor_sets(&wds);
     }
@@ -174,47 +182,61 @@ impl<'a> DescriptorSetBuilder<'a> {
         self.context.end_single_time_commands(command_buffer)?;
 
         let mut bindings = vec![];
+        // Acceleration structure
         bindings.push(self.add_binding(
             0,
             1,
             vk::DescriptorType::ACCELERATION_STRUCTURE_NV,
             vk::ShaderStageFlags::RAYGEN_NV | vk::ShaderStageFlags::CLOSEST_HIT_NV,
         ));
+        // Output image (framebuffer)
         bindings.push(self.add_binding(
             1,
             1,
             vk::DescriptorType::STORAGE_IMAGE,
             vk::ShaderStageFlags::RAYGEN_NV,
         ));
+        // Camera
         bindings.push(self.add_binding(
             2,
             1,
             vk::DescriptorType::UNIFORM_BUFFER,
             vk::ShaderStageFlags::RAYGEN_NV,
         ));
+        // Vertex buffer
         bindings.push(self.add_binding(
             3,
             1,
             vk::DescriptorType::STORAGE_BUFFER,
             vk::ShaderStageFlags::CLOSEST_HIT_NV,
         ));
+        // Index buffer
         bindings.push(self.add_binding(
             4,
             1,
             vk::DescriptorType::STORAGE_BUFFER,
             vk::ShaderStageFlags::CLOSEST_HIT_NV,
         ));
+        // Material buffer
         bindings.push(self.add_binding(
             5,
             1,
             vk::DescriptorType::STORAGE_BUFFER,
             vk::ShaderStageFlags::CLOSEST_HIT_NV,
         ));
+        // Textures
         bindings.push(self.add_binding(
             6,
             self.geometry_instance.textures.len() as u32,
             vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
             vk::ShaderStageFlags::CLOSEST_HIT_NV,
+        ));
+        // Clear color
+        bindings.push(self.add_binding(
+            7,
+            1,
+            vk::DescriptorType::UNIFORM_BUFFER,
+            vk::ShaderStageFlags::MISS_NV,
         ));
 
         let descriptor_pool = self.generate_pool(&bindings)?;

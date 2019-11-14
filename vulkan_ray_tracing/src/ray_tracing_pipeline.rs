@@ -30,6 +30,7 @@ pub struct RayTracingPipeline {
     _bottom_level_as: Vec<AccelerationStructure>,
     geometry_instance: GeometryInstance,
     camera_buffer: Buffer,
+    clear_buffer: Buffer,
     ray_tracing: Rc<RayTracing>,
 }
 
@@ -78,6 +79,7 @@ impl RayTracingPipeline {
             context.get_current_back_buffer_view(),
             self.camera_buffer.get(),
             &self.geometry_instance,
+            self.clear_buffer.get(),
         );
 
         let command_buffer = context.get_current_command_buffer();
@@ -191,6 +193,13 @@ impl<'a> RayTracingPipelineBuilder<'a> {
             .with_size(mem::size_of::<UniformBufferObject>() as u64)
             .build()?;
 
+        let clear_buffer = BufferBuilder::new(&self.context)
+            .with_type(BufferType::Uniform)
+            .with_size((mem::size_of::<f32>() * 4) as u64)
+            .build()?;
+        let clear_color = self.context.get_clear_value();
+        clear_buffer.copy_data(clear_color.as_ptr() as *const _)?;
+
         let geometry_instance = self.geometry_instance.as_ref().unwrap();
 
         let (bottom_level_as, top_level_as) =
@@ -205,6 +214,7 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         Ok(RayTracingPipeline {
             ray_tracing,
             camera_buffer,
+            clear_buffer,
             geometry_instance: self.geometry_instance.unwrap(),
             _bottom_level_as: bottom_level_as,
             top_level_as,
