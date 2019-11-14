@@ -4,7 +4,6 @@ use std::path::Path;
 use std::rc::Rc;
 
 use ash::vk;
-use nalgebra_glm as glm;
 use vulkan_bootstrap::buffer::{Buffer, BufferBuilder, BufferType};
 use vulkan_bootstrap::errors::VulkanError;
 use vulkan_bootstrap::shader_module::ShaderModuleBuilder;
@@ -35,31 +34,8 @@ pub struct RayTracingPipeline {
 }
 
 impl RayTracingPipeline {
-    pub fn update_camera_buffer(&self, width: f32, height: f32) -> Result<(), VulkanError> {
-        let model = glm::identity();
-        let model_it = glm::inverse_transpose(model);
-        let view = glm::look_at(
-            &glm::vec3(4.0, 4.0, 4.0),
-            &glm::vec3(0.0, 0.0, 0.0),
-            &glm::vec3(0.0, 1.0, 0.0),
-        );
-        let aspect_ratio = width / height;
-        let mut proj = glm::perspective(f32::to_radians(65.0), aspect_ratio, 0.1, 1000.0);
-        proj[(1, 1)] = -proj[(1, 1)];
-        let view_inverse = glm::inverse(&view);
-        let proj_inverse = glm::inverse(&proj);
-
-        let ubo = UniformBufferObject {
-            model,
-            view,
-            proj,
-            model_it,
-            view_inverse,
-            proj_inverse,
-        };
-
-        let data = &ubo as *const UniformBufferObject as *const c_void;
-
+    pub fn update_camera_buffer(&self, ubo: &UniformBufferObject) -> Result<(), VulkanError> {
+        let data = ubo as *const UniformBufferObject as *const c_void;
         self.camera_buffer.copy_data(data)
     }
 
