@@ -14,14 +14,14 @@ use vulkan_ray_tracing::ray_tracing_pipeline::{RayTracingPipeline, RayTracingPip
 
 use crate::model::Model;
 
-pub struct Renderer {
+pub struct RenderManager {
     context: VulkanContext,
     pipeline: Option<RayTracingPipeline>,
     width: u32,
     height: u32,
 }
 
-impl Renderer {
+impl RenderManager {
     pub fn new(debug: bool, hwnd: *const c_void, width: u32, height: u32) -> Self {
         let extensions = vec![
             DeviceExtensions::ExtDescriptorIndexing,
@@ -70,8 +70,8 @@ impl Renderer {
         }
     }
 
-    pub fn set_clear_color(&mut self, clear_color: glm::Vec4) {
-        self.context.set_clear_value(clear_color.into());
+    pub fn set_clear_color(&mut self, clear_color: &glm::Vec4) {
+        self.context.set_clear_value((*clear_color).into());
     }
 
     pub fn load_model(&mut self, filename: &Path) {
@@ -89,11 +89,12 @@ impl Renderer {
             .with_geometry_instance(geom)
             .build()
             .unwrap();
+
         self.pipeline = Some(ray_tracing_pipeline);
     }
 
     pub fn draw(&mut self) {
-        let pipeline = self.pipeline.as_mut().unwrap();
+        let pipeline = self.pipeline.as_mut().expect("No scene loaded.");
 
         pipeline
             .update_camera_buffer(self.width as f32, self.height as f32)

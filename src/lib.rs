@@ -1,5 +1,5 @@
-pub mod application;
-pub mod renderer;
+pub mod application_manager;
+pub mod render_manager;
 pub mod model;
 
-mod window;
+mod window_manager;

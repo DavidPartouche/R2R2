@@ -5,12 +5,11 @@ use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::platform::desktop::EventLoopExtDesktop;
 use winit::platform::windows::WindowExtWindows;
-use winit::window as winit_window;
-use winit::window::WindowBuilder;
+use winit::window::{WindowBuilder, Window};
 
-pub struct Window {
+pub struct WindowManager {
     event_loop: EventLoop<()>,
-    window: winit_window::Window,
+    window: Window,
 }
 
 pub struct Size {
@@ -18,8 +17,8 @@ pub struct Size {
     pub height: u32,
 }
 
-impl Window {
-    pub fn new(title: &str, width: u32, height: u32) -> Result<Window, OsError> {
+impl WindowManager {
+    pub fn new(title: &str, width: u32, height: u32) -> Result<WindowManager, OsError> {
         let event_loop = EventLoop::new();
 
         let window = WindowBuilder::new()
@@ -28,7 +27,7 @@ impl Window {
             .with_resizable(false)
             .build(&event_loop)?;
 
-        Ok(Window { event_loop, window })
+        Ok(WindowManager { event_loop, window })
     }
 
     pub fn hwnd(&self) -> *mut c_void {
