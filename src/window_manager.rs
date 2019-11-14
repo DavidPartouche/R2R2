@@ -1,11 +1,11 @@
 use std::os::raw::c_void;
 
 use winit::error::OsError;
-use winit::event::{Event, WindowEvent};
+use winit::event::{DeviceEvent, Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::platform::desktop::EventLoopExtDesktop;
 use winit::platform::windows::WindowExtWindows;
-use winit::window::{WindowBuilder, Window};
+use winit::window::{Window, WindowBuilder};
 
 pub struct WindowManager {
     event_loop: EventLoop<()>,
@@ -43,12 +43,14 @@ impl WindowManager {
         }
     }
 
-    pub fn run<T>(self, mut draw: T)
+    pub fn run<T>(self, mut update: T)
     where
-        T: FnMut(),
+        T: FnMut(&[DeviceEvent]),
     {
         let mut event_loop = self.event_loop;
         let window = self.window;
+
+        let mut events = vec![];
 
         event_loop.run_return(move |event, _, control_flow| {
             match event {
@@ -61,7 +63,11 @@ impl WindowManager {
                     ..
                 } => {
                     // Redraw the application
-                    draw();
+                    update(&events);
+                    events.clear();
+                }
+                Event::DeviceEvent { event, .. } => {
+                    events.push(event);
                 }
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,

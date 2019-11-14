@@ -1,5 +1,6 @@
 use simplelog::{Config, LevelFilter, SimpleLogger};
 
+use crate::input_manager::InputManager;
 use crate::render_manager::RenderManager;
 use crate::window_manager::WindowManager;
 use std::path::Path;
@@ -9,6 +10,7 @@ use vulkan_ray_tracing::glm;
 pub struct ApplicationManager {
     render_manager: RenderManager,
     window_manager: Option<WindowManager>,
+    input_manager: InputManager,
     target_framerate: u32,
     begin_ticks: Instant,
     delta_time: f32,
@@ -19,7 +21,8 @@ impl ApplicationManager {
         let window = self.window_manager.take();
         window
             .expect("Window already running, call run only once!")
-            .run(|| {
+            .run(|events| {
+                self.input_manager.update(events);
                 self.render_manager.update_camera(self.delta_time);
                 self.render_manager.render_scene();
                 let end_ticks = Instant::now();
@@ -112,6 +115,7 @@ impl ApplicationManagerBuilder {
         ApplicationManager {
             window_manager: Some(window),
             render_manager,
+            input_manager: InputManager::new(),
             target_framerate: self.target_framerate,
             begin_ticks: Instant::now(),
             delta_time: 1.0 / self.target_framerate as f32,
