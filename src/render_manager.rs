@@ -70,8 +70,8 @@ impl RenderManager {
         }
     }
 
-    pub fn set_clear_color(&mut self, clear_color: &glm::Vec4) {
-        self.context.set_clear_value((*clear_color).into());
+    pub fn set_clear_color(&mut self, clear_color: glm::Vec4) {
+        self.context.set_clear_value(clear_color.into());
     }
 
     pub fn load_model(&mut self, filename: &Path) {
@@ -93,13 +93,19 @@ impl RenderManager {
         self.pipeline = Some(ray_tracing_pipeline);
     }
 
-    pub fn draw(&mut self) {
-        let pipeline = self.pipeline.as_mut().expect("No scene loaded.");
-
-        pipeline
+    pub fn update_camera(&mut self) {
+        self.pipeline
+            .as_ref()
+            .unwrap()
             .update_camera_buffer(self.width as f32, self.height as f32)
             .unwrap();
+    }
 
-        pipeline.draw(&mut self.context).unwrap();
+    pub fn render_scene(&mut self) {
+        self.pipeline
+            .as_mut()
+            .unwrap()
+            .draw(&mut self.context)
+            .unwrap();
     }
 }
