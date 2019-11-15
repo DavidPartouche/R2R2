@@ -11,6 +11,6 @@ members = ["vulkan_ray_tracing"]
 image = "0.22.3"
 simplelog = "0.7.3"
 tobj = "0.1.11"
-vulkan_bootstrap = { path = "../vulkan_bootstrap" }
+vulkan_bootstrap = { git = "https://github.com/DavidPartouche/vulkan_bootstrap" }
 vulkan_ray_tracing = { path = "vulkan_ray_tracing" }
 winit = "0.20.0-alpha3"

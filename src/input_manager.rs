@@ -52,10 +52,6 @@ impl InputManager {
         self.mouse_delta
     }
 
-    pub fn is_left_button_down(&self) -> bool {
-        self.left_button_down
-    }
-
     pub fn is_right_button_down(&self) -> bool {
         self.right_button_down
     }

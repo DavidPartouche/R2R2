@@ -122,7 +122,9 @@ impl CameraManager {
                 self.mouse_grabbed = false;
                 window.set_cursor_grab(false).unwrap();
                 window.set_cursor_visible(true);
-                window.set_cursor_position(self.last_mouse_position);
+                window
+                    .set_cursor_position(self.last_mouse_position)
+                    .unwrap();
             }
             return;
         }

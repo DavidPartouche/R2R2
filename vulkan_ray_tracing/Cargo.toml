@@ -8,5 +8,5 @@ edition = "2018"
 ash = "0.29.0"
 memoffset = "0.5.1"
 nalgebra-glm = "0.4.2"
-vulkan_bootstrap = { path = "../../vulkan_bootstrap" }
+vulkan_bootstrap = { git = "https://github.com/DavidPartouche/vulkan_bootstrap" }
 
