@@ -14,11 +14,12 @@ use vulkan_ray_tracing::ray_tracing_pipeline::{RayTracingPipeline, RayTracingPip
 
 use crate::camera_manager::CameraManager;
 use crate::model::Model;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 pub struct RenderManager {
-    context: VulkanContext,
-    camera_manager: Rc<CameraManager>,
+    context: Rc<RefCell<VulkanContext>>,
+    camera_manager: Rc<RefCell<CameraManager>>,
     pipeline: Option<RayTracingPipeline>,
 }
 
@@ -28,7 +29,7 @@ impl RenderManager {
         hwnd: *const c_void,
         width: u32,
         height: u32,
-        camera_manager: Rc<CameraManager>,
+        camera_manager: Rc<RefCell<CameraManager>>,
     ) -> Self {
         let extensions = vec![
             DeviceExtensions::ExtDescriptorIndexing,
@@ -60,14 +61,16 @@ impl RenderManager {
             height,
         };
 
-        let context = VulkanContextBuilder::new()
-            .with_debug_options(debug_options)
-            .with_window(window)
-            .with_extensions(extensions)
-            .with_features(Features::all())
-            .with_frames_count(2)
-            .build()
-            .unwrap();
+        let context = Rc::new(RefCell::new(
+            VulkanContextBuilder::new()
+                .with_debug_options(debug_options)
+                .with_window(window)
+                .with_extensions(extensions)
+                .with_features(Features::all())
+                .with_frames_count(2)
+                .build()
+                .unwrap(),
+        ));
 
         Self {
             context,
@@ -76,14 +79,16 @@ impl RenderManager {
         }
     }
 
-    pub fn set_clear_color(&mut self, clear_color: glm::Vec4) {
-        self.context.set_clear_value(clear_color.into());
+    pub fn set_clear_color(&self, clear_color: glm::Vec4) {
+        self.context
+            .borrow_mut()
+            .set_clear_value(clear_color.into());
     }
 
     pub fn load_model(&mut self, filename: &Path) {
         let mut model = Model::new(filename);
 
-        let geom = GeometryInstanceBuilder::new(&self.context)
+        let geom = GeometryInstanceBuilder::new(&self.context.borrow())
             .with_vertices(&mut model.vertices)
             .with_indices(&mut model.indices)
             .with_materials(&mut model.materials)
@@ -91,9 +96,9 @@ impl RenderManager {
             .build()
             .unwrap();
 
-        let ray_tracing_pipeline = RayTracingPipelineBuilder::new(&self.context)
+        let ray_tracing_pipeline = RayTracingPipelineBuilder::new(Rc::clone(&self.context))
             .with_geometry_instance(geom)
-            .with_camera_buffer_size(self.camera_manager.get_camera_buffer_size() as u64)
+            .with_camera_buffer_size(self.camera_manager.borrow().get_camera_buffer_size() as u64)
             .build()
             .unwrap();
 
@@ -103,11 +108,11 @@ impl RenderManager {
     pub fn render_scene(&mut self) {
         let pipeline = self.pipeline.as_mut().unwrap();
         pipeline
-            .update_camera_buffer(self.camera_manager.get_camera_buffer(), &self.context)
+            .update_camera_buffer(self.camera_manager.borrow().get_camera_buffer())
             .unwrap();
 
-        pipeline.begin_draw(&mut self.context).unwrap();
-        pipeline.draw(&self.context).unwrap();
-        pipeline.end_draw(&mut self.context).unwrap();
+        pipeline.begin_draw().unwrap();
+        pipeline.draw().unwrap();
+        pipeline.end_draw().unwrap();
     }
 }

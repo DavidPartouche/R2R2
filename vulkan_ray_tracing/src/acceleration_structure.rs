@@ -19,7 +19,7 @@ pub struct Instance {
     pub hit_group_index: u32,
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 struct VulkanGeometryInstance {
     transform: [f32; 12],
     instance_id_and_mask: u32,

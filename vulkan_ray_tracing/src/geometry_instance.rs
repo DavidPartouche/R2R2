@@ -15,7 +15,7 @@ pub struct ImageBuffer {
     pub tex_channels: u32,
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct Vertex {
     pub pos: glm::Vec3,
     pub nrm: glm::Vec3,
@@ -69,7 +69,7 @@ impl Vertex {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct Material {
     pub ambient: glm::Vec3,
     pub diffuse: glm::Vec3,

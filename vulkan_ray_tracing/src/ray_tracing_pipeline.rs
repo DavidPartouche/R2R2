@@ -19,8 +19,10 @@ use crate::geometry_instance::{GeometryInstance, Vertex};
 use crate::pipeline::{Pipeline, PipelineBuilder};
 use crate::ray_tracing::{RayTracing, RayTracingBuilder};
 use crate::shader_binding_table::{ShaderBindingTable, ShaderBindingTableBuilder};
+use std::cell::RefCell;
 
 pub struct RayTracingPipeline {
+    context: Rc<RefCell<VulkanContext>>,
     sbt: ShaderBindingTable,
     pipeline: Pipeline,
     descriptor_set: DescriptorSet,
@@ -33,22 +35,19 @@ pub struct RayTracingPipeline {
 }
 
 impl RayTracingPipeline {
-    pub fn update_camera_buffer(
-        &self,
-        camera_buffer: &[u8],
-        context: &VulkanContext,
-    ) -> Result<(), VulkanError> {
-        let command_buffer = context.begin_single_time_commands()?;
+    pub fn update_camera_buffer(&self, camera_buffer: &[u8]) -> Result<(), VulkanError> {
+        let command_buffer = self.context.borrow().begin_single_time_commands()?;
         self.camera_buffer
             .update_buffer(command_buffer, camera_buffer);
-        context.end_single_time_commands(command_buffer)
+        self.context
+            .borrow()
+            .end_single_time_commands(command_buffer)
     }
 
-    pub fn begin_draw(&mut self, context: &mut VulkanContext) -> Result<(), VulkanError> {
-        context.frame_begin()?;
+    pub fn begin_draw(&mut self) -> Result<(), VulkanError> {
+        self.context.borrow_mut().frame_begin()?;
 
         self.create_image_barrier(
-            context,
             vk::AccessFlags::empty(),
             vk::AccessFlags::TRANSFER_WRITE,
             vk::ImageLayout::UNDEFINED,
@@ -57,7 +56,7 @@ impl RayTracingPipeline {
 
         self.descriptor_set.update_render_target(
             self.top_level_as.get(),
-            context.get_current_back_buffer_view(),
+            self.context.borrow().get_current_back_buffer_view(),
             self.camera_buffer.get(),
             &self.geometry_instance,
             self.clear_buffer.get(),
@@ -66,16 +65,16 @@ impl RayTracingPipeline {
         Ok(())
     }
 
-    pub fn draw(&mut self, context: &VulkanContext) -> Result<(), VulkanError> {
-        let command_buffer = context.get_current_command_buffer();
-        context.begin_render_pass();
-        context.get_device().cmd_bind_pipeline(
+    pub fn draw(&self) -> Result<(), VulkanError> {
+        let command_buffer = self.context.borrow().get_current_command_buffer();
+        self.context.borrow().begin_render_pass();
+        self.context.borrow().get_device().cmd_bind_pipeline(
             command_buffer,
             vk::PipelineBindPoint::RAY_TRACING_NV,
             self.pipeline.get(),
         );
 
-        context.get_device().cmd_bind_descriptor_sets(
+        self.context.borrow().get_device().cmd_bind_descriptor_sets(
             command_buffer,
             self.pipeline.get_layout(),
             vk::PipelineBindPoint::RAY_TRACING_NV,
@@ -92,39 +91,40 @@ impl RayTracingPipeline {
             self.sbt.get(),
             self.sbt.hit_group_offset,
             self.sbt.hit_group_entry_size,
-            context.get_swapchain().get_extent().width,
-            context.get_swapchain().get_extent().height,
+            self.context.borrow().get_swapchain().get_extent().width,
+            self.context.borrow().get_swapchain().get_extent().height,
             1,
         );
 
         self.create_image_barrier(
-            context,
             vk::AccessFlags::TRANSFER_WRITE,
             vk::AccessFlags::empty(),
             vk::ImageLayout::GENERAL,
             vk::ImageLayout::PRESENT_SRC_KHR,
         )?;
 
-        context.get_device().cmd_next_subpass(command_buffer);
+        self.context
+            .borrow()
+            .get_device()
+            .cmd_next_subpass(command_buffer);
 
         Ok(())
     }
 
-    pub fn end_draw(&self, context: &mut VulkanContext) -> Result<(), VulkanError> {
-        context.end_render_pass();
-        context.frame_end()?;
-        context.frame_present()
+    pub fn end_draw(&self) -> Result<(), VulkanError> {
+        self.context.borrow().end_render_pass();
+        self.context.borrow().frame_end()?;
+        self.context.borrow_mut().frame_present()
     }
 
     fn create_image_barrier(
         &self,
-        context: &VulkanContext,
         src_access_mask: vk::AccessFlags,
         dst_access_mask: vk::AccessFlags,
         old_layout: vk::ImageLayout,
         new_layout: vk::ImageLayout,
     ) -> Result<(), VulkanError> {
-        let command_buffer = context.begin_single_time_commands()?;
+        let command_buffer = self.context.borrow().begin_single_time_commands()?;
         let subresource_range = vk::ImageSubresourceRange::builder()
             .aspect_mask(vk::ImageAspectFlags::COLOR)
             .base_mip_level(0)
@@ -140,11 +140,11 @@ impl RayTracingPipeline {
             .new_layout(new_layout)
             .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
             .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .image(context.get_current_back_buffer())
+            .image(self.context.borrow().get_current_back_buffer())
             .subresource_range(subresource_range)
             .build();
 
-        context.get_device().cmd_pipeline_barrier(
+        self.context.borrow().get_device().cmd_pipeline_barrier(
             command_buffer,
             vk::PipelineStageFlags::ALL_COMMANDS,
             vk::PipelineStageFlags::ALL_COMMANDS,
@@ -153,18 +153,20 @@ impl RayTracingPipeline {
             &[],
             &[image_memory_barrier],
         );
-        context.end_single_time_commands(command_buffer)
+        self.context
+            .borrow()
+            .end_single_time_commands(command_buffer)
     }
 }
 
-pub struct RayTracingPipelineBuilder<'a> {
-    context: &'a VulkanContext,
+pub struct RayTracingPipelineBuilder {
+    context: Rc<RefCell<VulkanContext>>,
     geometry_instance: Option<GeometryInstance>,
     camera_buffer_size: vk::DeviceSize,
 }
 
-impl<'a> RayTracingPipelineBuilder<'a> {
-    pub fn new(context: &'a VulkanContext) -> Self {
+impl RayTracingPipelineBuilder {
+    pub fn new(context: Rc<RefCell<VulkanContext>>) -> Self {
         RayTracingPipelineBuilder {
             context,
             geometry_instance: None,
@@ -176,31 +178,33 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         self.geometry_instance = Some(geometry_instance);
         self
     }
-    
+
     pub fn with_camera_buffer_size(mut self, camera_buffer_size: vk::DeviceSize) -> Self {
         self.camera_buffer_size = camera_buffer_size;
         self
     }
 
     pub fn build(self) -> Result<RayTracingPipeline, VulkanError> {
-        let ray_tracing = Rc::new(RayTracingBuilder::new(&self.context).build()?);
+        let ray_tracing = Rc::new(RayTracingBuilder::new(&self.context.borrow()).build()?);
 
-        let camera_buffer = BufferBuilder::new(&self.context)
+        let camera_buffer = BufferBuilder::new(&self.context.borrow())
             .with_type(BufferType::Uniform)
             .with_size(self.camera_buffer_size)
             .build()?;
 
-        let clear_buffer = BufferBuilder::new(&self.context)
+        let clear_buffer = BufferBuilder::new(&self.context.borrow())
             .with_type(BufferType::Uniform)
             .with_size((mem::size_of::<f32>() * 4) as u64)
             .build()?;
 
-        let clear_color = self.context.get_clear_value().as_ptr() as *const u8;
+        let clear_color = self.context.borrow().get_clear_value().as_ptr() as *const u8;
         let clear_color =
             unsafe { std::slice::from_raw_parts(clear_color, std::mem::size_of::<f32>() * 4) };
-        let command_buffer = self.context.begin_single_time_commands()?;
+        let command_buffer = self.context.borrow().begin_single_time_commands()?;
         clear_buffer.update_buffer(command_buffer, clear_color);
-        self.context.end_single_time_commands(command_buffer)?;
+        self.context
+            .borrow()
+            .end_single_time_commands(command_buffer)?;
 
         let geometry_instance = self.geometry_instance.as_ref().unwrap();
 
@@ -214,6 +218,7 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         let sbt = self.create_shader_binding_table(&ray_tracing, &pipeline)?;
 
         Ok(RayTracingPipeline {
+            context: self.context,
             ray_tracing,
             camera_buffer,
             clear_buffer,
@@ -231,13 +236,14 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         ray_tracing: Rc<RayTracing>,
         geometry_instance: &GeometryInstance,
     ) -> Result<(Vec<AccelerationStructure>, AccelerationStructure), VulkanError> {
-        let command_buffer = self.context.begin_single_time_commands().unwrap();
+        let command_buffer = self.context.borrow().begin_single_time_commands().unwrap();
 
         let blas = self.create_bottom_level_as(geometry_instance);
-        let structure = AccelerationStructureBuilder::new(&self.context, Rc::clone(&ray_tracing))
-            .with_bottom_level_as(&[blas])
-            .with_command_buffer(command_buffer)
-            .build()?;
+        let structure =
+            AccelerationStructureBuilder::new(&self.context.borrow(), Rc::clone(&ray_tracing))
+                .with_bottom_level_as(&[blas])
+                .with_command_buffer(command_buffer)
+                .build()?;
         let bottom_level_as = vec![structure];
 
         let instances: Vec<Instance> = bottom_level_as
@@ -252,12 +258,14 @@ impl<'a> RayTracingPipelineBuilder<'a> {
             .collect();
 
         let top_level_as =
-            AccelerationStructureBuilder::new(&self.context, Rc::clone(&ray_tracing))
+            AccelerationStructureBuilder::new(&self.context.borrow(), Rc::clone(&ray_tracing))
                 .with_top_level_as(&instances)
                 .with_command_buffer(command_buffer)
                 .build()?;
 
-        self.context.end_single_time_commands(command_buffer)?;
+        self.context
+            .borrow()
+            .end_single_time_commands(command_buffer)?;
 
         Ok((bottom_level_as, top_level_as))
     }
@@ -279,7 +287,7 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         &self,
         geometry_instance: &GeometryInstance,
     ) -> Result<DescriptorSet, VulkanError> {
-        DescriptorSetBuilder::new(&self.context, geometry_instance).build()
+        DescriptorSetBuilder::new(&self.context.borrow(), geometry_instance).build()
     }
 
     fn create_pipeline(
@@ -287,20 +295,23 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         ray_tracing: &RayTracing,
         descriptor_set: &DescriptorSet,
     ) -> Result<Pipeline, VulkanError> {
-        let ray_gen_module = ShaderModuleBuilder::new(Rc::clone(&self.context.get_device()))
-            .with_path(Path::new("assets/shaders/raygen.spv"))
-            .build()?;
-        let miss_module = ShaderModuleBuilder::new(Rc::clone(&self.context.get_device()))
+        let ray_gen_module =
+            ShaderModuleBuilder::new(Rc::clone(&self.context.borrow().get_device()))
+                .with_path(Path::new("assets/shaders/raygen.spv"))
+                .build()?;
+        let miss_module = ShaderModuleBuilder::new(Rc::clone(&self.context.borrow().get_device()))
             .with_path(Path::new("assets/shaders/miss.spv"))
             .build()?;
-        let shadow_miss_module = ShaderModuleBuilder::new(Rc::clone(&self.context.get_device()))
-            .with_path(Path::new("assets/shaders/shadow_miss.spv"))
-            .build()?;
-        let closest_hit_module = ShaderModuleBuilder::new(Rc::clone(&self.context.get_device()))
-            .with_path(Path::new("assets/shaders/closesthit.spv"))
-            .build()?;
+        let shadow_miss_module =
+            ShaderModuleBuilder::new(Rc::clone(&self.context.borrow().get_device()))
+                .with_path(Path::new("assets/shaders/shadow_miss.spv"))
+                .build()?;
+        let closest_hit_module =
+            ShaderModuleBuilder::new(Rc::clone(&self.context.borrow().get_device()))
+                .with_path(Path::new("assets/shaders/closesthit.spv"))
+                .build()?;
 
-        PipelineBuilder::new(&self.context, ray_tracing, descriptor_set)
+        PipelineBuilder::new(&self.context.borrow(), ray_tracing, descriptor_set)
             .with_ray_gen_shader(ray_gen_module)
             .with_miss_shader(miss_module)
             .with_shadow_miss_shader(shadow_miss_module)
@@ -314,6 +325,6 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         ray_tracing: &RayTracing,
         pipeline: &Pipeline,
     ) -> Result<ShaderBindingTable, VulkanError> {
-        ShaderBindingTableBuilder::new(&self.context, ray_tracing, pipeline).build()
+        ShaderBindingTableBuilder::new(&self.context.borrow(), ray_tracing, pipeline).build()
     }
 }

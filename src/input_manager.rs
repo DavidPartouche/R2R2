@@ -1,25 +1,34 @@
-use winit::event::DeviceEvent;
+use std::collections::HashSet;
+use winit::event::{DeviceEvent, ElementState, VirtualKeyCode};
 
 pub struct InputManager {
-    mouse_delta: (f64, f64),
+    key_inputs: HashSet<VirtualKeyCode>,
 }
 
 impl InputManager {
     pub fn new() -> Self {
         InputManager {
-            mouse_delta: (0.0, 0.0),
+            key_inputs: HashSet::new(),
         }
     }
 
     pub fn update(&mut self, events: &[DeviceEvent]) {
         for event in events {
             match *event {
-                DeviceEvent::MouseMotion { delta } => {
-                    self.mouse_delta = delta;
+                DeviceEvent::Key(input) => {
+                    if let Some(keycode) = input.virtual_keycode {
+                        match input.state {
+                            ElementState::Pressed => self.key_inputs.insert(keycode),
+                            ElementState::Released => self.key_inputs.remove(&keycode),
+                        };
+                    }
                 }
-                DeviceEvent::Key(_) => {}
                 _ => {}
             }
         }
+    }
+
+    pub fn is_key_pressed(&self, keycode: VirtualKeyCode) -> bool {
+        self.key_inputs.contains(&keycode)
     }
 }
