@@ -1,6 +1,7 @@
 pub mod application_manager;
-pub mod model;
-pub mod render_manager;
 
+mod camera_manager;
 mod input_manager;
+mod model;
+mod render_manager;
 mod window_manager;

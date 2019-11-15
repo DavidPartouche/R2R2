@@ -1,16 +1,19 @@
 use simplelog::{Config, LevelFilter, SimpleLogger};
 
+use crate::camera_manager::CameraManager;
 use crate::input_manager::InputManager;
 use crate::render_manager::RenderManager;
 use crate::window_manager::WindowManager;
 use std::path::Path;
+use std::rc::Rc;
 use std::time::Instant;
 use vulkan_ray_tracing::glm;
 
 pub struct ApplicationManager {
-    render_manager: RenderManager,
     window_manager: Option<WindowManager>,
     input_manager: InputManager,
+    camera_manager: Rc<CameraManager>,
+    render_manager: RenderManager,
     target_framerate: u32,
     begin_ticks: Instant,
     delta_time: f32,
@@ -23,7 +26,7 @@ impl ApplicationManager {
             .expect("Window already running, call run only once!")
             .run(|events| {
                 self.input_manager.update(events);
-                self.render_manager.update_camera(self.delta_time);
+                self.camera_manager.update(self.delta_time);
                 self.render_manager.render_scene();
                 let end_ticks = Instant::now();
                 self.delta_time = end_ticks.duration_since(self.begin_ticks).as_secs_f32();
@@ -101,8 +104,16 @@ impl ApplicationManagerBuilder {
         let window = WindowManager::new(&self.title, self.width, self.height)
             .expect("Cannot create a window!");
 
+        let camera_manager = Rc::new(CameraManager::new(self.width as f32, self.height as f32));
+
         let size = window.size();
-        let mut render_manager = RenderManager::new(true, window.hwnd(), size.width, size.height);
+        let mut render_manager = RenderManager::new(
+            true,
+            window.hwnd(),
+            size.width,
+            size.height,
+            Rc::clone(&camera_manager),
+        );
 
         render_manager.set_clear_color(self.clear_color);
 
@@ -114,8 +125,9 @@ impl ApplicationManagerBuilder {
 
         ApplicationManager {
             window_manager: Some(window),
-            render_manager,
             input_manager: InputManager::new(),
+            camera_manager,
+            render_manager,
             target_framerate: self.target_framerate,
             begin_ticks: Instant::now(),
             delta_time: 1.0 / self.target_framerate as f32,

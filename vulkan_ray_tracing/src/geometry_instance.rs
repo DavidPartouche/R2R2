@@ -70,16 +70,6 @@ impl Vertex {
 }
 
 #[repr(C, packed)]
-pub struct UniformBufferObject {
-    pub model: glm::Mat4,
-    pub view: glm::Mat4,
-    pub proj: glm::Mat4,
-    pub model_it: glm::Mat4,
-    pub view_inverse: glm::Mat4,
-    pub proj_inverse: glm::Mat4,
-}
-
-#[repr(C, packed)]
 pub struct Material {
     pub ambient: glm::Vec3,
     pub diffuse: glm::Vec3,

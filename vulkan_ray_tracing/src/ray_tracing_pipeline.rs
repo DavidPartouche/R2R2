@@ -15,7 +15,7 @@ use crate::bottom_level_acceleration_structure::{
     BottomLevelAccelerationStructure, BottomLevelAccelerationStructureBuilder,
 };
 use crate::descriptor_set::{DescriptorSet, DescriptorSetBuilder};
-use crate::geometry_instance::{GeometryInstance, UniformBufferObject, Vertex};
+use crate::geometry_instance::{GeometryInstance, Vertex};
 use crate::pipeline::{Pipeline, PipelineBuilder};
 use crate::ray_tracing::{RayTracing, RayTracingBuilder};
 use crate::shader_binding_table::{ShaderBindingTable, ShaderBindingTableBuilder};
@@ -35,14 +35,12 @@ pub struct RayTracingPipeline {
 impl RayTracingPipeline {
     pub fn update_camera_buffer(
         &self,
-        ubo: &UniformBufferObject,
+        camera_buffer: &[u8],
         context: &VulkanContext,
     ) -> Result<(), VulkanError> {
-        let data = ubo as *const UniformBufferObject as *const u8;
-        let data =
-            unsafe { std::slice::from_raw_parts(data, std::mem::size_of::<UniformBufferObject>()) };
         let command_buffer = context.begin_single_time_commands()?;
-        self.camera_buffer.update_buffer(command_buffer, data);
+        self.camera_buffer
+            .update_buffer(command_buffer, camera_buffer);
         context.end_single_time_commands(command_buffer)
     }
 
@@ -162,6 +160,7 @@ impl RayTracingPipeline {
 pub struct RayTracingPipelineBuilder<'a> {
     context: &'a VulkanContext,
     geometry_instance: Option<GeometryInstance>,
+    camera_buffer_size: vk::DeviceSize,
 }
 
 impl<'a> RayTracingPipelineBuilder<'a> {
@@ -169,11 +168,17 @@ impl<'a> RayTracingPipelineBuilder<'a> {
         RayTracingPipelineBuilder {
             context,
             geometry_instance: None,
+            camera_buffer_size: 0,
         }
     }
 
     pub fn with_geometry_instance(mut self, geometry_instance: GeometryInstance) -> Self {
         self.geometry_instance = Some(geometry_instance);
+        self
+    }
+    
+    pub fn with_camera_buffer_size(mut self, camera_buffer_size: vk::DeviceSize) -> Self {
+        self.camera_buffer_size = camera_buffer_size;
         self
     }
 
@@ -182,7 +187,7 @@ impl<'a> RayTracingPipelineBuilder<'a> {
 
         let camera_buffer = BufferBuilder::new(&self.context)
             .with_type(BufferType::Uniform)
-            .with_size(mem::size_of::<UniformBufferObject>() as u64)
+            .with_size(self.camera_buffer_size)
             .build()?;
 
         let clear_buffer = BufferBuilder::new(&self.context)
