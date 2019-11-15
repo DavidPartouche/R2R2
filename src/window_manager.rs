@@ -1,5 +1,6 @@
 use std::os::raw::c_void;
 
+use winit::dpi::LogicalPosition;
 use winit::error::OsError;
 use winit::event::{DeviceEvent, Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -45,12 +46,13 @@ impl WindowManager {
 
     pub fn run<T>(self, mut update: T)
     where
-        T: FnMut(&[DeviceEvent]),
+        T: FnMut(&Window, &LogicalPosition, &[DeviceEvent]),
     {
         let mut event_loop = self.event_loop;
         let window = self.window;
 
         let mut events = vec![];
+        let mut mouse_position = LogicalPosition::new(0.0, 0.0);
 
         event_loop.run_return(move |event, _, control_flow| {
             match event {
@@ -63,8 +65,14 @@ impl WindowManager {
                     ..
                 } => {
                     // Redraw the application
-                    update(&events);
+                    update(&window, &mouse_position, &events);
                     events.clear();
+                }
+                Event::WindowEvent {
+                    event: WindowEvent::CursorMoved { position, .. },
+                    ..
+                } => {
+                    mouse_position = position;
                 }
                 Event::DeviceEvent { event, .. } => {
                     events.push(event);

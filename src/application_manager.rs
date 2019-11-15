@@ -25,9 +25,11 @@ impl ApplicationManager {
         let window = self.window_manager.take();
         window
             .expect("Window already running, call run only once!")
-            .run(|events| {
+            .run(|window, mouse_position, events| {
                 self.input_manager.borrow_mut().update(events);
-                self.camera_manager.borrow_mut().update(self.delta_time);
+                self.camera_manager
+                    .borrow_mut()
+                    .update(window, mouse_position, self.delta_time);
                 self.render_manager.render_scene();
                 let end_ticks = Instant::now();
                 self.delta_time = end_ticks.duration_since(self.begin_ticks).as_secs_f32();
