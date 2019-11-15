@@ -1,5 +1,4 @@
 use std::mem;
-use std::os::raw::c_void;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -34,12 +33,20 @@ pub struct RayTracingPipeline {
 }
 
 impl RayTracingPipeline {
-    pub fn update_camera_buffer(&self, ubo: &UniformBufferObject) -> Result<(), VulkanError> {
-        let data = ubo as *const UniformBufferObject as *const c_void;
-        self.camera_buffer.copy_data(data)
+    pub fn update_camera_buffer(
+        &self,
+        ubo: &UniformBufferObject,
+        context: &VulkanContext,
+    ) -> Result<(), VulkanError> {
+        let data = ubo as *const UniformBufferObject as *const u8;
+        let data =
+            unsafe { std::slice::from_raw_parts(data, std::mem::size_of::<UniformBufferObject>()) };
+        let command_buffer = context.begin_single_time_commands()?;
+        self.camera_buffer.update_buffer(command_buffer, data);
+        context.end_single_time_commands(command_buffer)
     }
 
-    pub fn draw(&mut self, context: &mut VulkanContext) -> Result<(), VulkanError> {
+    pub fn begin_draw(&mut self, context: &mut VulkanContext) -> Result<(), VulkanError> {
         context.frame_begin()?;
 
         self.create_image_barrier(
@@ -58,6 +65,10 @@ impl RayTracingPipeline {
             self.clear_buffer.get(),
         );
 
+        Ok(())
+    }
+
+    pub fn draw(&mut self, context: &VulkanContext) -> Result<(), VulkanError> {
         let command_buffer = context.get_current_command_buffer();
         context.begin_render_pass();
         context.get_device().cmd_bind_pipeline(
@@ -97,6 +108,11 @@ impl RayTracingPipeline {
         )?;
 
         context.get_device().cmd_next_subpass(command_buffer);
+
+        Ok(())
+    }
+
+    pub fn end_draw(&self, context: &mut VulkanContext) -> Result<(), VulkanError> {
         context.end_render_pass();
         context.frame_end()?;
         context.frame_present()
@@ -173,8 +189,13 @@ impl<'a> RayTracingPipelineBuilder<'a> {
             .with_type(BufferType::Uniform)
             .with_size((mem::size_of::<f32>() * 4) as u64)
             .build()?;
-        let clear_color = self.context.get_clear_value();
-        clear_buffer.copy_data(clear_color.as_ptr() as *const _)?;
+
+        let clear_color = self.context.get_clear_value().as_ptr() as *const u8;
+        let clear_color =
+            unsafe { std::slice::from_raw_parts(clear_color, std::mem::size_of::<f32>() * 4) };
+        let command_buffer = self.context.begin_single_time_commands()?;
+        clear_buffer.update_buffer(command_buffer, clear_color);
+        self.context.end_single_time_commands(command_buffer)?;
 
         let geometry_instance = self.geometry_instance.as_ref().unwrap();
 

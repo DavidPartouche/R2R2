@@ -121,15 +121,14 @@ impl RenderManager {
         self.pipeline
             .as_ref()
             .unwrap()
-            .update_camera_buffer(&ubo)
+            .update_camera_buffer(&ubo, &self.context)
             .unwrap();
     }
 
     pub fn render_scene(&mut self) {
-        self.pipeline
-            .as_mut()
-            .unwrap()
-            .draw(&mut self.context)
-            .unwrap();
+        let pipeline = self.pipeline.as_mut().unwrap();
+        pipeline.begin_draw(&mut self.context).unwrap();
+        pipeline.draw(&self.context).unwrap();
+        pipeline.end_draw(&mut self.context).unwrap();
     }
 }
