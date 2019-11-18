@@ -48,10 +48,10 @@ impl RayTracingPipeline {
         self.context.borrow_mut().frame_begin()?;
 
         self.create_image_barrier(
-            vk::AccessFlags::empty(),
+            vk::AccessFlags::MEMORY_READ,
             vk::AccessFlags::TRANSFER_WRITE,
             vk::ImageLayout::UNDEFINED,
-            vk::ImageLayout::GENERAL,
+            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
         )?;
 
         self.descriptor_set.update_render_target(
@@ -98,8 +98,8 @@ impl RayTracingPipeline {
 
         self.create_image_barrier(
             vk::AccessFlags::TRANSFER_WRITE,
-            vk::AccessFlags::empty(),
-            vk::ImageLayout::GENERAL,
+            vk::AccessFlags::MEMORY_READ,
+            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
             vk::ImageLayout::PRESENT_SRC_KHR,
         )?;
 
