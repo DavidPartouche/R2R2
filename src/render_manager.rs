@@ -1,5 +1,4 @@
 use std::os::raw::c_void;
-use std::path::Path;
 use std::ptr::null;
 
 use vulkan_bootstrap::debug::{DebugOptions, DebugSeverity, DebugType};
@@ -8,13 +7,12 @@ use vulkan_bootstrap::features::Features;
 use vulkan_bootstrap::vulkan_context::{VulkanContext, VulkanContextBuilder};
 use vulkan_bootstrap::windows::Win32Window;
 
-use vulkan_ray_tracing::geometry_instance::GeometryInstanceBuilder;
+use vulkan_ray_tracing::geometry_instance::GeometryInstance;
 use vulkan_ray_tracing::glm;
 use vulkan_ray_tracing::ray_tracing_pipeline::{RayTracingPipeline, RayTracingPipelineBuilder};
 
 use crate::camera_manager::CameraManager;
-use crate::model::Model;
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::rc::Rc;
 
 pub struct RenderManager {
@@ -85,17 +83,11 @@ impl RenderManager {
             .set_clear_value(clear_color.into());
     }
 
-    pub fn load_model(&mut self, filename: &Path) {
-        let mut model = Model::new(filename);
+    pub fn get_context(&self) -> Ref<VulkanContext> {
+        self.context.borrow()
+    }
 
-        let geom = GeometryInstanceBuilder::new(&self.context.borrow())
-            .with_vertices(&mut model.vertices)
-            .with_indices(&mut model.indices)
-            .with_materials(&mut model.materials)
-            .with_textures(&mut model.textures)
-            .build()
-            .unwrap();
-
+    pub fn load_geometry(&mut self, geom: GeometryInstance) {
         let ray_tracing_pipeline = RayTracingPipelineBuilder::new(Rc::clone(&self.context))
             .with_geometry_instance(geom)
             .with_camera_buffer_size(self.camera_manager.borrow().get_camera_buffer_size() as u64)
@@ -106,7 +98,10 @@ impl RenderManager {
     }
 
     pub fn render_scene(&mut self) {
-        let pipeline = self.pipeline.as_mut().unwrap();
+        let pipeline = self
+            .pipeline
+            .as_mut()
+            .expect("No pipeline created, did you forget to load a scene?");
         pipeline
             .update_camera_buffer(self.camera_manager.borrow().get_camera_buffer())
             .unwrap();

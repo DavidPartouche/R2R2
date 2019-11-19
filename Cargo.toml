@@ -8,6 +8,7 @@ edition = "2018"
 members = ["vulkan_ray_tracing"]
 
 [dependencies]
+gltf = "0.14.0"
 image = "0.22.3"
 simplelog = "0.7.3"
 tobj = "0.1.11"

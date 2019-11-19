@@ -16,60 +16,6 @@ pub struct ImageBuffer {
 }
 
 #[repr(C)]
-pub struct Vertex {
-    pub pos: glm::Vec3,
-    pub nrm: glm::Vec3,
-    pub color: glm::Vec3,
-    pub tex_coord: glm::Vec2,
-    pub mat_id: i32,
-}
-
-impl Vertex {
-    pub fn get_binding_description() -> vk::VertexInputBindingDescription {
-        vk::VertexInputBindingDescription::builder()
-            .binding(0)
-            .stride(mem::size_of::<Vertex>() as u32)
-            .input_rate(vk::VertexInputRate::VERTEX)
-            .build()
-    }
-
-    pub fn get_attribute_descriptions() -> [vk::VertexInputAttributeDescription; 5] {
-        [
-            vk::VertexInputAttributeDescription::builder()
-                .binding(0)
-                .location(0)
-                .format(vk::Format::R32G32B32_SFLOAT)
-                .offset(memoffset::offset_of!(Vertex, pos) as u32)
-                .build(),
-            vk::VertexInputAttributeDescription::builder()
-                .binding(0)
-                .location(1)
-                .format(vk::Format::R32G32B32_SFLOAT)
-                .offset(memoffset::offset_of!(Vertex, nrm) as u32)
-                .build(),
-            vk::VertexInputAttributeDescription::builder()
-                .binding(0)
-                .location(2)
-                .format(vk::Format::R32G32B32_SFLOAT)
-                .offset(memoffset::offset_of!(Vertex, color) as u32)
-                .build(),
-            vk::VertexInputAttributeDescription::builder()
-                .binding(0)
-                .location(3)
-                .format(vk::Format::R32G32_SFLOAT)
-                .offset(memoffset::offset_of!(Vertex, tex_coord) as u32)
-                .build(),
-            vk::VertexInputAttributeDescription::builder()
-                .binding(0)
-                .location(4)
-                .format(vk::Format::R32_SINT)
-                .offset(memoffset::offset_of!(Vertex, mat_id) as u32)
-                .build(),
-        ]
-    }
-}
-
-#[repr(C)]
 pub struct Material {
     pub ambient: glm::Vec3,
     pub diffuse: glm::Vec3,
@@ -104,18 +50,20 @@ pub struct GeometryInstance {
     pub vertex_buffer: Buffer,
     pub vertex_count: u32,
     pub vertex_offset: u32,
+    pub vertex_size: u32,
     pub index_buffer: Buffer,
     pub index_count: u32,
     pub index_offset: u32,
-    pub material_buffer: Buffer,
-    pub textures: Vec<Texture>,
+    //    pub material_buffer: Buffer,
+    //    pub textures: Vec<Texture>,
     pub transform: glm::Mat4,
 }
 
 pub struct GeometryInstanceBuilder<'a> {
     context: &'a VulkanContext,
-    vertices: Vec<Vertex>,
-    indices: Vec<u32>,
+    vertices: Option<&'a [u8]>,
+    vertices_count: usize,
+    indices: Option<&'a [u16]>,
     materials: Vec<Material>,
     textures: Vec<ImageBuffer>,
 }
@@ -124,20 +72,22 @@ impl<'a> GeometryInstanceBuilder<'a> {
     pub fn new(context: &'a VulkanContext) -> Self {
         GeometryInstanceBuilder {
             context,
-            vertices: vec![],
-            indices: vec![],
+            vertices: None,
+            vertices_count: 0,
+            indices: None,
             materials: vec![],
             textures: vec![],
         }
     }
 
-    pub fn with_vertices(mut self, vertices: &mut Vec<Vertex>) -> Self {
-        self.vertices.append(vertices);
+    pub fn with_vertices(mut self, vertices: &'a [u8], vertices_count: usize) -> Self {
+        self.vertices = Some(vertices);
+        self.vertices_count = vertices_count;
         self
     }
 
-    pub fn with_indices(mut self, indices: &mut Vec<u32>) -> Self {
-        self.indices.append(indices);
+    pub fn with_indices(mut self, indices: &'a [u16]) -> Self {
+        self.indices = Some(indices);
         self
     }
 
@@ -154,34 +104,34 @@ impl<'a> GeometryInstanceBuilder<'a> {
     pub fn build(self) -> Result<GeometryInstance, VulkanError> {
         let transform = glm::identity();
 
-        let vertex_buffer = self.create_vertex_buffer(&self.vertices)?;
-        let index_buffer = self.create_index_buffer(&self.indices)?;
-        let material_buffer = self.create_material_buffer(&self.materials)?;
-        let textures = self.create_texture_images(&self.textures)?;
+        let vertex_buffer = self.create_vertex_buffer(&self.vertices.unwrap())?;
+        let index_buffer = self.create_index_buffer(&self.indices.unwrap())?;
+        //        let material_buffer = self.create_material_buffer(&self.materials)?;
+        //        let textures = self.create_texture_images(&self.textures)?;
 
         Ok(GeometryInstance {
             vertex_buffer,
-            vertex_count: self.vertices.len() as u32,
+            vertex_count: self.vertices_count as u32,
             vertex_offset: 0,
+            vertex_size: (self.vertices.unwrap().len() / self.vertices_count) as u32,
             index_buffer,
-            index_count: self.indices.len() as u32,
+            index_count: self.indices.unwrap().len() as u32,
             index_offset: 0,
-            material_buffer,
-            textures,
+            //            material_buffer,
+            //            textures,
             transform,
         })
     }
 
-    fn create_vertex_buffer(&self, vertices: &[Vertex]) -> Result<Buffer, VulkanError> {
-        let size = (mem::size_of::<Vertex>() * vertices.len()) as vk::DeviceSize;
-        let vertices = vertices.as_ptr() as *const c_void;
-        self.create_buffer(BufferType::Vertex, size, vertices)
+    fn create_vertex_buffer(&self, vertices: &[u8]) -> Result<Buffer, VulkanError> {
+        let data = vertices.as_ptr() as *const c_void;
+        self.create_buffer(BufferType::Vertex, vertices.len() as vk::DeviceSize, data)
     }
 
-    fn create_index_buffer(&self, indices: &[u32]) -> Result<Buffer, VulkanError> {
-        let size = (mem::size_of::<u32>() * indices.len()) as vk::DeviceSize;
-        let indices = indices.as_ptr() as *const c_void;
-        self.create_buffer(BufferType::Index, size, indices)
+    fn create_index_buffer(&self, indices: &[u16]) -> Result<Buffer, VulkanError> {
+        let size = (mem::size_of::<u16>() * indices.len()) as vk::DeviceSize;
+        let data = indices.as_ptr() as *const c_void;
+        self.create_buffer(BufferType::Index, size, data)
     }
 
     fn create_material_buffer(&self, materials: &[Material]) -> Result<Buffer, VulkanError> {

@@ -3,24 +3,29 @@ use simplelog::{Config, LevelFilter, SimpleLogger};
 use crate::camera_manager::{CameraManager, CameraProperties};
 use crate::input_manager::InputManager;
 use crate::render_manager::RenderManager;
+use crate::scene::scene_manager::SceneManager;
 use crate::window_manager::WindowManager;
 use std::cell::RefCell;
-use std::path::Path;
 use std::rc::Rc;
 use std::time::Instant;
 use vulkan_ray_tracing::glm;
 
 pub struct ApplicationManager {
     window_manager: Option<WindowManager>,
+    scene_manager: SceneManager,
     input_manager: Rc<RefCell<InputManager>>,
     camera_manager: Rc<RefCell<CameraManager>>,
-    render_manager: RenderManager,
+    render_manager: Rc<RefCell<RenderManager>>,
     target_framerate: u32,
     begin_ticks: Instant,
     delta_time: f32,
 }
 
 impl ApplicationManager {
+    pub fn load_default_scene(&mut self) {
+        self.scene_manager.load_default_scene();
+    }
+
     pub fn run(&mut self) {
         let window = self.window_manager.take();
         window
@@ -30,7 +35,7 @@ impl ApplicationManager {
                 self.camera_manager
                     .borrow_mut()
                     .update(window, mouse_position, self.delta_time);
-                self.render_manager.render_scene();
+                self.render_manager.borrow_mut().render_scene();
                 let end_ticks = Instant::now();
                 self.delta_time = end_ticks.duration_since(self.begin_ticks).as_secs_f32();
                 // If delta time is too big, it probably means that we hit a breakpoint
@@ -124,24 +129,20 @@ impl ApplicationManagerBuilder {
         )));
 
         let size = window.size();
-        let mut render_manager = RenderManager::new(
+        let render_manager = Rc::new(RefCell::new(RenderManager::new(
             true,
             window.hwnd(),
             size.width,
             size.height,
             Rc::clone(&camera_manager),
-        );
+        )));
+        render_manager.borrow().set_clear_color(self.clear_color);
 
-        render_manager.set_clear_color(self.clear_color);
-
-        let scene = Path::new(&self.scene);
-        if !scene.exists() {
-            panic!("No scene loaded");
-        }
-        render_manager.load_model(scene);
+        let scene_manager = SceneManager::new(&self.scene, Rc::clone(&render_manager));
 
         ApplicationManager {
             window_manager: Some(window),
+            scene_manager,
             input_manager,
             camera_manager,
             render_manager,

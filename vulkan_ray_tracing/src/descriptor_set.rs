@@ -102,7 +102,7 @@ impl DescriptorSet {
             .build();
         wds.push(index_wds);
 
-        let mat_info = vk::DescriptorBufferInfo::builder()
+        /*        let mat_info = vk::DescriptorBufferInfo::builder()
             .buffer(geometry_instance.material_buffer.get())
             .offset(0)
             .range(vk::WHOLE_SIZE)
@@ -132,7 +132,7 @@ impl DescriptorSet {
             .dst_binding(6)
             .image_info(&image_infos)
             .build();
-        wds.push(textures_wds);
+        wds.push(textures_wds);*/
 
         let clear_info = vk::DescriptorBufferInfo::builder()
             .buffer(clear_buffer)
@@ -218,7 +218,7 @@ impl<'a> DescriptorSetBuilder<'a> {
             vk::ShaderStageFlags::CLOSEST_HIT_NV,
         ));
         // Material buffer
-        bindings.push(self.add_binding(
+        /*bindings.push(self.add_binding(
             5,
             1,
             vk::DescriptorType::STORAGE_BUFFER,
@@ -230,7 +230,7 @@ impl<'a> DescriptorSetBuilder<'a> {
             self.geometry_instance.textures.len() as u32,
             vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
             vk::ShaderStageFlags::CLOSEST_HIT_NV,
-        ));
+        ));*/
         // Clear color
         bindings.push(self.add_binding(
             7,

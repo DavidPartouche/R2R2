@@ -15,7 +15,7 @@ use crate::bottom_level_acceleration_structure::{
     BottomLevelAccelerationStructure, BottomLevelAccelerationStructureBuilder,
 };
 use crate::descriptor_set::{DescriptorSet, DescriptorSetBuilder};
-use crate::geometry_instance::{GeometryInstance, Vertex};
+use crate::geometry_instance::GeometryInstance;
 use crate::pipeline::{Pipeline, PipelineBuilder};
 use crate::ray_tracing::{RayTracing, RayTracingBuilder};
 use crate::shader_binding_table::{ShaderBindingTable, ShaderBindingTableBuilder};
@@ -275,7 +275,7 @@ impl RayTracingPipelineBuilder {
             .with_vertex_buffer(geom.vertex_buffer.get())
             .with_vertex_offset(geom.vertex_offset)
             .with_vertex_count(geom.vertex_count)
-            .with_vertex_size(mem::size_of::<Vertex>() as u32)
+            .with_vertex_size(geom.vertex_size)
             .with_index_buffer(geom.index_buffer.get())
             .with_index_offset(geom.index_offset)
             .with_index_count(geom.index_count)

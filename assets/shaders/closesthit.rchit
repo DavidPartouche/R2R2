@@ -7,7 +7,7 @@ layout(location = 2) rayPayloadNV bool isShadowed;
 
 hitAttributeNV vec3 attribs;
 layout(binding = 0, set = 0) uniform accelerationStructureNV topLevelAS;
-layout(binding = 3, set = 0) buffer Vertices { vec4 v[]; }
+layout(binding = 3, set = 0) buffer Vertices { vec3 v[]; }
 vertices;
 layout(binding = 4, set = 0) buffer Indices { uint i[]; }
 indices;
@@ -18,24 +18,26 @@ layout(binding = 6, set = 0) uniform sampler2D[] textureSamplers;
 struct Vertex {
     vec3 pos;
     vec3 nrm;
-    vec3 color;
-    vec2 texCoord;
-    int matIndex;
+//    vec3 color;
+//    vec2 texCoord;
+//    int matIndex;
 };
 
 uint vertexSize = 3;
 
 Vertex unpackVertex(uint index) {
     Vertex v;
-    vec4 d0 = vertices.v[vertexSize * index + 0];
-    vec4 d1 = vertices.v[vertexSize * index + 1];
-    vec4 d2 = vertices.v[vertexSize * index + 2];
+    vec3 d0 = vertices.v[vertexSize * index + 0];
+    vec3 d1 = vertices.v[vertexSize * index + 1];
+//    vec4 d2 = vertices.v[vertexSize * index + 2];
 
-    v.pos = d0.xyz;
-    v.nrm = vec3(d0.w, d1.x, d1.y);
-    v.color = vec3(d1.z, d1.w, d2.x);
-    v.texCoord = vec2(d2.y, d2.z);
-    v.matIndex = floatBitsToInt(d2.w);
+    v.pos = d0;
+    v.nrm = d1;
+//    v.pos = d0.xyz;
+//    v.nrm = vec3(d0.w, d1.x, d1.y);
+//    v.color = vec3(d1.z, d1.w, d2.x);
+//    v.texCoord = vec2(d2.y, d2.z);
+//    v.matIndex = floatBitsToInt(d2.w);
     return v;
 }
 
@@ -90,12 +92,13 @@ void main()
     vec3 lightVector = normalize(vec3(5, 4, 3));
     float dot_product = max(dot(lightVector, normal), 0.2);
 
-    Material mat = unpackMaterial(v1.matIndex);
+   vec3 c = dot_product * vec3(0.7, 0.7, 0.7);
+    /*Material mat = unpackMaterial(v1.matIndex);
     vec3 c = dot_product * mat.diffuse;
     if(mat.textureId >= 0) {
         vec2 texCoord = v0.texCoord * barycentrics.x + v1.texCoord * barycentrics.y + v2.texCoord * barycentrics.z;
         c *= texture(textureSamplers[mat.textureId], texCoord).xyz;
-    }
+    }*/
 
     float tmin = 0.001;
     float tmax = 100.0;
