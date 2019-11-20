@@ -21,6 +21,17 @@ struct Material {
     _padding: [f32; 2],
 }
 
+impl Default for Material {
+    fn default() -> Self {
+        Material {
+            base_color_factor: glm::vec4(0.7, 0.7, 0.7, 1.0),
+            metallic_factor: 0.0,
+            roughness_factor: 0.0,
+            _padding: [0.0, 0.0],
+        }
+    }
+}
+
 struct Mesh {
     indices: Vec<u32>,
     vertices: Vec<Vertex>,
@@ -73,7 +84,7 @@ impl SceneManager {
                     positions.len(),
                 );
 
-                let material = primitive.material().index().unwrap();
+                let material = primitive.material().index().unwrap_or(0);
 
                 let mut vertices = Vec::with_capacity(positions.len() / 3);
                 for i in 0..positions.len() / 3 {
@@ -111,6 +122,10 @@ impl SceneManager {
                 _padding: [0.0, 0.0],
             };
             materials.push(mat);
+        }
+
+        if self.document.materials().len() == 0 {
+            materials.push(Material::default());
         }
 
         Scene { meshes, materials }
