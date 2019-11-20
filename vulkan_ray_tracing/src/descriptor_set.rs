@@ -102,7 +102,7 @@ impl DescriptorSet {
             .build();
         wds.push(index_wds);
 
-        /*        let mat_info = vk::DescriptorBufferInfo::builder()
+        let mat_info = vk::DescriptorBufferInfo::builder()
             .buffer(geometry_instance.material_buffer.get())
             .offset(0)
             .range(vk::WHOLE_SIZE)
@@ -116,7 +116,7 @@ impl DescriptorSet {
             .build();
         wds.push(mat_wds);
 
-        let mut image_infos = vec![];
+        /*let mut image_infos = vec![];
         for texture in geometry_instance.textures.iter() {
             let image_info = vk::DescriptorImageInfo::builder()
                 .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
@@ -218,14 +218,14 @@ impl<'a> DescriptorSetBuilder<'a> {
             vk::ShaderStageFlags::CLOSEST_HIT_NV,
         ));
         // Material buffer
-        /*bindings.push(self.add_binding(
+        bindings.push(self.add_binding(
             5,
             1,
             vk::DescriptorType::STORAGE_BUFFER,
             vk::ShaderStageFlags::CLOSEST_HIT_NV,
         ));
         // Textures
-        bindings.push(self.add_binding(
+        /*bindings.push(self.add_binding(
             6,
             self.geometry_instance.textures.len() as u32,
             vk::DescriptorType::COMBINED_IMAGE_SAMPLER,

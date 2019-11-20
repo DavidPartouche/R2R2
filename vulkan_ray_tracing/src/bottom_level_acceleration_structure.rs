@@ -83,7 +83,7 @@ impl BottomLevelAccelerationStructureBuilder {
             .index_data(self.index_buffer.unwrap())
             .index_offset(self.index_offset)
             .index_count(self.index_count)
-            .index_type(vk::IndexType::UINT16)
+            .index_type(vk::IndexType::UINT32)
             .transform_data(vk::Buffer::null())
             .transform_offset(0)
             .build();
